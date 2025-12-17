@@ -1,0 +1,358 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #000;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+#gameCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#lives-board {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 24px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.player-lives {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lives-label {
+    font-weight: 700;
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+}
+
+.lives-icons {
+    font-size: 20px;
+    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.8));
+}
+
+.kills-label {
+    font-size: 16px;
+    margin-left: 15px;
+    font-weight: 600;
+    text-shadow: 0 0 8px currentColor, 0 0 15px currentColor;
+}
+
+.screen {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.95);
+    padding: 30px;
+    border: 2px solid #0ff;
+    border-radius: 10px;
+    box-shadow: 0 0 20px #0ff, inset 0 0 20px #0ff;
+    transition: opacity 0.3s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.screen.active {
+    opacity: 1;
+    pointer-events: auto;
+    display: block;
+}
+
+.screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+}
+
+/* Game Over Popup Style */
+#game-over-screen {
+    max-width: 500px;
+    padding: 30px 40px;
+    background: rgba(0, 0, 0, 0.98);
+    border: 3px solid #f0f;
+    box-shadow: 0 0 30px #f0f, inset 0 0 20px rgba(255, 0, 255, 0.3);
+}
+
+#game-over-screen h1 {
+    font-size: 48px;
+    color: #f0f;
+    text-shadow: 0 0 20px #f0f, 0 0 40px #f0f;
+    margin-bottom: 20px;
+}
+
+#game-over-screen p {
+    margin-bottom: 10px;
+    font-size: 20px;
+    color: #fff;
+    text-shadow: 0 0 10px #fff;
+}
+
+/* Pause Screen Style (Matching Game Over but Cyan) */
+#pause-screen {
+    max-width: 500px;
+    padding: 30px 40px;
+    background: rgba(0, 0, 0, 0.98);
+    border: 3px solid #0ff;
+    box-shadow: 0 0 30px #0ff, inset 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+#pause-screen h1 {
+    font-size: 48px;
+    color: #0ff;
+    text-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: rgb(0, 140, 255);
+    text-shadow: 0 0 20px rgb(0, 140, 255), 0 0 40px rgb(0, 140, 255);
+    letter-spacing: 4px;
+}
+
+/* Customization Panel */
+.customization-panel {
+    margin: 15px 0;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.player-customization {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid rgba(0, 255, 255, 0.3);
+    min-width: 250px;
+}
+
+.player-customization h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.option-group {
+    margin-bottom: 15px;
+}
+
+.option-group h3 {
+    color: #0ff;
+    text-shadow: 0 0 10px #0ff;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+/* Color Select Buttons - Compact Neon Style */
+.color-select {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    margin: 3px;
+    transition: all 0.3s;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    pointer-events: auto;
+}
+
+.color-select:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 15px #fff, 0 0 25px #fff;
+    border-width: 2px;
+}
+
+.color-select.selected {
+    box-shadow: 0 0 20px #fff, 0 0 30px #fff, inset 0 0 10px rgba(255, 255, 255, 0.5);
+    transform: scale(1.15);
+    border-width: 2px;
+}
+
+/* Shape Select Buttons - Compact Neon Style */
+.shape-select {
+    padding: 6px 12px;
+    background: transparent;
+    border: 2px solid #0ff;
+    color: #0ff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 3px;
+    border-radius: 4px;
+    text-shadow: 0 0 5px #0ff;
+    box-shadow: 0 0 8px rgba(0, 255, 255, 0.3), inset 0 0 8px rgba(0, 255, 255, 0.1);
+    pointer-events: auto;
+}
+
+.shape-select:hover {
+    background: rgba(0, 255, 255, 0.2);
+    box-shadow: 0 0 15px #0ff, 0 0 25px #0ff, inset 0 0 12px rgba(0, 255, 255, 0.3);
+    transform: translateY(-1px);
+    text-shadow: 0 0 8px #0ff, 0 0 12px #0ff;
+}
+
+.shape-select.selected {
+    background: #0ff;
+    color: #000;
+    box-shadow: 0 0 20px #0ff, 0 0 30px #0ff, inset 0 0 15px rgba(0, 255, 255, 0.5);
+    text-shadow: none;
+    font-weight: 700;
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* Main Action Buttons - Enhanced Neon Style */
+#start-btn,
+#restart-btn,
+#home-btn,
+#resume-btn,
+#quit-btn {
+    padding: 15px 40px;
+    font-size: 24px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    background: transparent;
+    border: 3px solid #f0f;
+    color: #f0f;
+    cursor: pointer;
+    text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+    box-shadow: 0 0 20px #f0f, 0 0 40px rgba(255, 0, 255, 0.5), inset 0 0 15px rgba(255, 0, 255, 0.2);
+    transition: all 0.3s ease;
+    margin-top: 20px;
+    border-radius: 8px;
+    letter-spacing: 2px;
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+}
+
+#start-btn::before,
+#restart-btn::before,
+#home-btn::before,
+#resume-btn::before,
+#quit-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 0, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+#start-btn:hover::before,
+#restart-btn:hover::before,
+#home-btn:hover::before,
+#resume-btn:hover::before,
+#quit-btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+#start-btn:hover,
+#restart-btn:hover,
+#home-btn:hover,
+#resume-btn:hover,
+#quit-btn:hover {
+    background: rgba(255, 0, 255, 0.3);
+    color: #fff;
+    box-shadow: 0 0 30px #f0f, 0 0 60px #f0f, 0 0 90px rgba(255, 0, 255, 0.5), inset 0 0 30px rgba(255, 0, 255, 0.4);
+    transform: scale(1.05) translateY(-3px);
+    text-shadow: 0 0 15px #fff, 0 0 25px #f0f, 0 0 35px #f0f;
+    border-color: #fff;
+}
+
+#start-btn:active,
+#restart-btn:active,
+#home-btn:active,
+#resume-btn:active,
+#quit-btn:active {
+    transform: scale(0.98) translateY(0);
+    box-shadow: 0 0 15px #f0f, 0 0 30px #f0f, inset 0 0 20px rgba(255, 0, 255, 0.5);
+}
+
+/* Color and Shape Options Container */
+.color-options,
+.shape-options {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+/* Pause Button - Top Right */
+#pause-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: transparent;
+    border: 3px solid #0ff;
+    color: #0ff;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    border-radius: 50%;
+    /* Circular button */
+    cursor: pointer;
+    z-index: 1000;
+    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 10px #0ff, inset 0 0 10px rgba(0, 255, 255, 0.3);
+    text-shadow: 0 0 5px #0ff;
+    transition: all 0.3s ease;
+}
+
+#pause-btn:hover {
+    transform: scale(1.1);
+    background: rgba(0, 255, 255, 0.2);
+    box-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
+}
+
+#pause-btn.hidden {
+    display: none;
+}

@@ -1,0 +1,65 @@
+NEON SHOOTER - GAME OVERVIEW
+============================
+
+This document explains the structure and logic of the Neon Shooter game.
+
+1. PROJECT STRUCTURE
+--------------------
+The game consists of three main files:
+- index.html: The structure of the web page, including the game canvas and user interface (UI) overlays.
+- style.css: The visual styling, responsible for the neon aesthetic, glowing effects, and layout.
+- game.js: The core JavaScript file containing the game logic, physics, and rendering.
+
+2. CORE GAMEPLAY
+----------------
+Neon Shooter is a 2-player vertical scrolling space shooter. Players control ships to destroy waves of enemies while avoiding collision and enemy fire. The game features an infinite loop that gets progressively harder.
+
+3. KEY COMPONENTS (JavaScript)
+------------------------------
+
+A. Game Loop
+   - The game runs on a loop using `requestAnimationFrame(gameLoop)`.
+   - update(deltaTime): Calculates physics, moves entities, handles collisions, and spawns enemies.
+   - draw(): Renders the game state to the HTML5 Canvas 60 times per second.
+
+B. Entities
+   - Player: Handles movement (velocity/acceleration), shooting, styling (custom shapes/colors), and life management.
+   - Enemy: 
+     * Standard: Basic enemies that fly down.
+     * Shooter: Enemies that fire bullets back at players. They spawn with specific animations (pulsing/wobbling).
+     * Boss: A large enemy that spawns every 150 kills. It moves in a sine-wave pattern and is much harder to kill.
+   - Bullet: Simple projectiles fired by players or enemies.
+   - Particle: A physics-based system used for explosions, muzzle flashes, and shockwaves.
+
+C. Power-Ups
+   - Spawns at specific kill intervals or randomly.
+   - Types:
+     * Side Shooter (⚡): Adds two extra guns to the player's ship.
+     * Life (❤️): Grants an extra life (up to 3).
+     * Shield (🛡️): Invincibility for a short duration.
+   - Animated using the 'anime.js' library for entry and pulsing effects.
+
+4. USER INTERFACE (HTML/CSS)
+----------------------------
+- Start Screen: Allows players to customize their ship's color and shape.
+- HUD: Displays lives and kill counts for Player 1 and Player 2 at the top.
+- Menus: Pause screen and Game Over screen with "Resume", "restart", and "Home" functionality.
+
+5. CONTROLS
+-----------
+- Player 1:
+  * Move: W, A, S, D
+  * Shoot: X key
+- Player 2:
+  * Move: Arrow Keys
+  * Shoot: Enter key
+- Global:
+  * Pause: 'P' or Escape
+
+6. LIBRARIES USED
+-----------------
+- Anime.js: A lightweight JavaScript animation library used for smooth UI transitions and entity animations (like power-up spawning and enemy wobbles).
+
+================================================================================
+SOURCE CODE APPENDED BELOW
+================================================================================
