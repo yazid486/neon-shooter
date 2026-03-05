@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neon Space Shooter</title>
+    <!-- Add modern fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -13,9 +18,9 @@
     <canvas id="gameCanvas"></canvas>
 
     <div id="ui-layer">
-        <div id="lives-board">
+        <div id="lives-board" class="hidden">
             <div class="player-lives" id="player1-lives">
-                <span class="lives-label" style="color: #0ff;">P1:</span>
+                <span class="lives-label" style="color: #0044ff;">P1:</span>
                 <span class="lives-icons" id="p1-lives">❤️❤️❤️</span>
                 <span class="kills-label" style="color: #0ff;">Kills: <span id="p1-kills">0</span></span>
             </div>
@@ -28,114 +33,151 @@
 
         <button id="pause-btn" class="hidden">||</button>
 
-        <div id="start-screen" class="screen active">
-            <h1>NEON SHOOTER</h1>
-            <div class="controls-info" style="margin-bottom: 20px; text-align: center; color: #fff;">
-                <div style="display: inline-block; margin: 0 20px;">
-                    <h3 style="color: #0ff;">Player 1</h3>
-                    <p>WASD to Move</p>
-                    <p>X to Shoot</p>
-                </div>
-                <div style="display: inline-block; margin: 0 20px;">
-                    <h3 style="color: #f00;">Player 2</h3>
-                    <p>ARROWS to Move</p>
-                    <p>ENTER to Shoot</p>
-                </div>
+        <!-- CyberHUD Start Screen -->
+        <div id="start-screen" class="screen active cyber-hud">
+            <!-- Background grids and decorations -->
+            <div class="hud-bg-pattern"></div>
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner bottom-right"></div>
+
+            <div class="hud-top-nav">
+                <span class="hud-coords"></span>
+                <span class="hud-coords pull-right"></span>
             </div>
-            <div class="customization-panel">
-                <!-- Player 1 Customization -->
-                <div class="player-customization">
-                    <h2 style="color: #0ff; text-shadow: 0 0 10px #0ff; margin-bottom: 15px;">Player 1</h2>
-                    <div class="option-group">
-                        <h3>Select Color</h3>
-                        <div class="color-options">
-                            <button class="color-select" data-player="1" data-color="rgb(4, 0, 255)"
-                                style="background-color: rgb(4, 0, 255);"></button>
-                            <button class="color-select" data-player="1" data-color="#ff0"
-                                style="background-color: #ff0;"></button>
-                            <button class="color-select" data-player="1" data-color="#0f0"
-                                style="background-color: #0f0;"></button>
-                            <button class="color-select" data-player="1" data-color="#f00"
-                                style="background-color: #f00;"></button>
-                            <button class="color-select" data-player="1" data-color="#f80"
-                                style="background-color: #f80;"></button>
-                            <button class="color-select" data-player="1" data-color="#80f"
-                                style="background-color: #80f;"></button>
-                            <button class="color-select" data-player="1" data-color="#fff"
-                                style="background-color: #fff;"></button>
-                        </div>
-                    </div>
 
-                    <div class="option-group">
-                        <h3>Select Shape</h3>
-                        <div class="shape-options">
-                            <button class="shape-select" data-player="1" data-shape="classic">Classic</button>
-                            <button class="shape-select" data-player="1" data-shape="fighter">Fighter</button>
-                            <button class="shape-select" data-player="1" data-shape="interceptor">Interceptor</button>
-                            <button class="shape-select" data-player="1" data-shape="bomber">Bomber</button>
-                            <button class="shape-select" data-player="1" data-shape="speeder">Speeder</button>
-                            <button class="shape-select" data-player="1" data-shape="stealth">Stealth</button>
-                            <button class="shape-select" data-player="1" data-shape="titan">Titan</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Player 2 Customization -->
-                <div class="player-customization">
-                    <h2 style="color: #f00; text-shadow: 0 0 10px #f00; margin-bottom: 15px;">Player 2</h2>
-                    <div class="option-group">
-                        <h3>Select Color</h3>
-                        <div class="color-options">
-                            <button class="color-select" data-player="2" data-color="rgb(4, 0, 255)"
-                                style="background-color: rgb(4, 0, 255);"></button>
-                            <button class="color-select" data-player="2" data-color="#ff0"
-                                style="background-color: #ff0;"></button>
-                            <button class="color-select" data-player="2" data-color="#0f0"
-                                style="background-color: #0f0;"></button>
-                            <button class="color-select" data-player="2" data-color="#f00"
-                                style="background-color: #f00;"></button>
-                            <button class="color-select" data-player="2" data-color="#f80"
-                                style="background-color: #f80;"></button>
-                            <button class="color-select" data-player="2" data-color="#80f"
-                                style="background-color: #80f;"></button>
-                            <button class="color-select" data-player="2" data-color="#fff"
-                                style="background-color: #fff;"></button>
-                        </div>
-                    </div>
-
-                    <div class="option-group">
-                        <h3>Select Shape</h3>
-                        <div class="shape-options">
-                            <button class="shape-select" data-player="2" data-shape="classic">Classic</button>
-                            <button class="shape-select" data-player="2" data-shape="fighter">Fighter</button>
-                            <button class="shape-select" data-player="2" data-shape="interceptor">Interceptor</button>
-                            <button class="shape-select" data-player="2" data-shape="bomber">Bomber</button>
-                            <button class="shape-select" data-player="2" data-shape="speeder">Speeder</button>
-                            <button class="shape-select" data-player="2" data-shape="stealth">Stealth</button>
-                            <button class="shape-select" data-player="2" data-shape="titan">Titan</button>
-                        </div>
-                    </div>
+            <div class="hud-center-zone">
+                <div class="cyber-circle"></div>
+                <h1 class="hud-main-text">NEON<br>SHOOTER</h1>
+                <div class="hud-subtitle">A TYPOGRAPHY EXPERIMENT 02 <span class="neon-star">*</span> LOGOTYPE “BRUTE”
                 </div>
             </div>
 
-            <button id="start-btn" style="margin-top: 30px;">START GAME</button>
-        </div>
-    </div>
+            <div class="hud-panels">
+                <!-- Player 1 -->
+                <div class="hud-panel p1-panel">
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 01 <span>[WASD+X]</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="1" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="1" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="1" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="1" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="1" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="1" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="1" data-shape="titan">Titan</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                <button class="color-select" data-player="1" data-color="rgb(4, 0, 255)"
+                                    style="background-color: rgb(4, 0, 255);"></button>
+                                <button class="color-select" data-player="1" data-color="#ff0"
+                                    style="background-color: #ff0;"></button>
+                                <button class="color-select" data-player="1" data-color="#0f0"
+                                    style="background-color: #0f0;"></button>
+                                <button class="color-select" data-player="1" data-color="#f00"
+                                    style="background-color: #f00;"></button>
+                                <button class="color-select" data-player="1" data-color="#f80"
+                                    style="background-color: #f80;"></button>
+                                <button class="color-select" data-player="1" data-color="#80f"
+                                    style="background-color: #80f;"></button>
+                                <button class="color-select" data-player="1" data-color="#fff"
+                                    style="background-color: #fff;"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div id="game-over-screen" class="screen hidden">
-        <h1>GAME OVER</h1>
-        <div class="button-group">
-            <button id="restart-btn">TRY AGAIN</button>
-            <button id="home-btn">HOME</button>
+                <!-- Player 2 -->
+                <div class="hud-panel p2-panel">
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 02 <span>[ARROWS+ENTER]</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="2" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="2" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="2" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="2" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="2" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="2" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="2" data-shape="titan">Titan</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                <button class="color-select" data-player="2" data-color="rgb(4, 0, 255)"
+                                    style="background-color: rgb(4, 0, 255);"></button>
+                                <button class="color-select" data-player="2" data-color="#ff0"
+                                    style="background-color: #ff0;"></button>
+                                <button class="color-select" data-player="2" data-color="#0f0"
+                                    style="background-color: #0f0;"></button>
+                                <button class="color-select" data-player="2" data-color="#f00"
+                                    style="background-color: #f00;"></button>
+                                <button class="color-select" data-player="2" data-color="#f80"
+                                    style="background-color: #f80;"></button>
+                                <button class="color-select" data-player="2" data-color="#80f"
+                                    style="background-color: #80f;"></button>
+                                <button class="color-select" data-player="2" data-color="#fff"
+                                    style="background-color: #fff;"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-bottom-bar">
+                <div class="hud-bottom-left">
+                    <span class="neon-star large">02</span>
+                    <span class="hud-icons">CE ♲ ☣</span>
+                    <span class="hud-coords">42.6629° N</span>
+                </div>
+
+                <button id="start-btn" class="hud-start-btn">
+                    <span>INITIALIZE</span>
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                    </svg>
+                </button>
+
+                <div class="hud-bottom-right">
+                    <span class="hud-coords">21.1655° E</span>
+                    <div class="barcode">|||| ||| | ||</div>
+                </div>
+            </div>
         </div>
-    </div>
-    <div id="pause-screen" class="screen hidden">
-        <h1>PAUSED</h1>
-        <div class="button-group">
-            <button id="resume-btn">RESUME</button>
-            <button id="quit-btn">HOME</button>
+
+        <div id="game-over-screen" class="screen hidden cyber-popup">
+            <div class="hud-bg-pattern"></div>
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            <h1 class="hud-main-text" style="font-size: 60px; margin-top: 30px;">SYSTEM FAILURE</h1>
+            <div class="button-group hud-bottom-bar"
+                style="border-top: none; background: transparent; justify-content: center; gap: 30px;">
+                <button id="restart-btn" class="hud-start-btn">REBOOT</button>
+                <button id="home-btn" class="hud-start-btn">MAIN_MENU</button>
+            </div>
         </div>
-    </div>
+
+        <div id="pause-screen" class="screen hidden cyber-popup">
+            <div class="hud-bg-pattern"></div>
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            <h1 class="hud-main-text" style="font-size: 60px; margin-top: 30px;">SYSTEM PAUSED</h1>
+            <div class="button-group hud-bottom-bar"
+                style="border-top: none; background: transparent; justify-content: center; gap: 30px;">
+                <button id="resume-btn" class="hud-start-btn">RESUME</button>
+                <button id="quit-btn" class="hud-start-btn">ABORT_SYSTEM</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
