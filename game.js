@@ -36,6 +36,7 @@ class Player {
         this.lastShot = 0;
         this.shootDelay = 150;
         this.controls = controls;
+        this.trail = [];
         this.isAlive = true;
         this.hasSideShooters = false;
         this.sideShooterEndTime = 0;
@@ -123,6 +124,12 @@ class Player {
             this.vy = 0;
         }
 
+        // Update trail
+        this.trail.push({ x: this.x, y: this.y + this.height / 2 });
+        if (this.trail.length > 15) {
+            this.trail.shift();
+        }
+
         // Shooting
         if (keys[this.controls.shoot]) {
             const now = performance.now();
@@ -178,6 +185,30 @@ class Player {
 
     draw(ctx) {
         if (!this.isAlive) return;
+
+        // Draw Trail
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.strokeStyle = this.color;
+
+            for (let i = 0; i < this.trail.length - 1; i++) {
+                const p1 = this.trail[i];
+                const p2 = this.trail[i + 1];
+                const progress = i / this.trail.length;
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.globalAlpha = Math.max(0, progress * 0.6);
+                ctx.lineWidth = this.width * 0.4 * progress;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
 
         // Draw shield if active
         if (this.hasShield) {
@@ -257,6 +288,7 @@ class Player {
         this.vy = 0;
         this.rotation = 0;
         this.bullets = [];
+        this.trail = [];
         this.isAlive = true;
         this.hasSideShooters = false;
         this.sideShooterEndTime = 0;
@@ -302,6 +334,8 @@ let players = [];
 let enemies = [];
 let particles = [];
 let powerUps = [];
+let stars = [];
+let planets = [];
 let enemySpawnTimer = 0;
 let enemySpawnInterval = 1000;
 let enemiesKilled = 0;
@@ -319,16 +353,49 @@ let startScreen;
 let gameOverScreen;
 let pauseScreen;
 let pauseBtn;
+let livesBoard;
 // Initialize Players
 function initPlayers() {
     players = [
-        new Player(canvas.width / 3, canvas.height - 100, '#0ff', {
+        new Player(canvas.width / 3, canvas.height - 100, '#0044ff', {
             up: 'w', down: 's', left: 'a', right: 'd', shoot: 'x'
         }, 1),
         new Player(2 * canvas.width / 3, canvas.height - 100, '#f00', {
             up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shoot: 'Enter'
         }, 2)
     ];
+}
+
+function initStars() {
+    stars = [];
+    if (!canvas) return;
+    for (let i = 0; i < 150; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 3 + 1,
+            alpha: Math.random() * 0.5 + 0.3
+        });
+    }
+}
+
+function initPlanets() {
+    planets = [];
+    if (!canvas) return;
+    for (let i = 0; i < 3; i++) {
+        let hue = Math.floor(Math.random() * 360);
+        planets.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 80 + 40,
+            hue: hue,
+            color: `hsl(${hue}, 50%, 20%)`,
+            speed: Math.random() * 0.3 + 0.8,
+            ring: Math.random() > 0.5,
+            ringAngle: Math.random() * Math.PI,
+        });
+    }
 }
 
 // Game Initialization
@@ -348,6 +415,7 @@ function initGame() {
         gameOverScreen = document.getElementById('game-over-screen');
         pauseScreen = document.getElementById('pause-screen');
         pauseBtn = document.getElementById('pause-btn');
+        livesBoard = document.getElementById('lives-board');
 
         const resumeBtn = document.getElementById('resume-btn');
         const quitBtn = document.getElementById('quit-btn');
@@ -367,11 +435,18 @@ function initGame() {
         window.addEventListener('resize', resize);
         resize();
 
+        initStars();
+        initPlanets();
         initPlayers(); // Init once to set up objects
         console.log("Players initialized");
 
         // Input Listeners
         window.addEventListener('keydown', (e) => {
+            // Prevent default behavior to stop accidental button clicks or page scrolling with game controls
+            if (['Enter', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) || e.code === 'Space') {
+                e.preventDefault();
+            }
+
             keys[e.key] = true;
             // Handle case-insensitive WASD
             if (e.key.length === 1) keys[e.key.toLowerCase()] = true;
@@ -515,8 +590,10 @@ function startGame() {
             enemySpawnInterval = 1000;
 
             if (pauseBtn) pauseBtn.classList.remove('hidden');
+            if (livesBoard) livesBoard.classList.remove('hidden');
 
             lastTime = performance.now();
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
             gameLoopId = requestAnimationFrame(gameLoop);
         }
     } catch (e) {
@@ -556,9 +633,11 @@ function goHome() {
     isGameOver = false;
     isPaused = false;
     if (pauseBtn) pauseBtn.classList.add('hidden');
+    if (livesBoard) livesBoard.classList.add('hidden');
 }
 
 function gameOver() {
+    if (isGameOver) return;
     isPlaying = false;
     isGameOver = true;
     // Don't cancel animation frame - let particles continue animating
@@ -591,6 +670,31 @@ function togglePause() {
 }
 
 function update(deltaTime) {
+    // Update Stars and Planets
+    if (isPlaying || isGameOver) {
+        stars.forEach(s => {
+            s.y += s.speed;
+            if (s.y > canvas.height) {
+                s.y = 0;
+                s.x = Math.random() * canvas.width;
+            }
+        });
+        planets.forEach(p => {
+            p.y += p.speed;
+            if (p.y > canvas.height + p.size * 2) {
+                p.y = -p.size * 2;
+                p.x = Math.random() * canvas.width;
+                let hue = Math.floor(Math.random() * 360);
+                p.hue = hue;
+                p.color = `hsl(${hue}, 50%, 20%)`;
+                p.size = Math.random() * 80 + 40;
+                p.speed = Math.random() * 0.3 + 0.8;
+                p.ring = Math.random() > 0.5;
+                p.ringAngle = Math.random() * Math.PI;
+            }
+        });
+    }
+
     // Update Particles (always update, even during game over)
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
@@ -862,6 +966,45 @@ function draw() {
     if (isPlaying || isGameOver) {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Planets
+        planets.forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            // Draw main body
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+
+            // Atmospheric shading
+            let gradient = ctx.createRadialGradient(-p.size * 0.3, -p.size * 0.3, p.size * 0.1, 0, 0, p.size);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Ring
+            if (p.ring) {
+                ctx.rotate(p.ringAngle);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, p.size * 2.2, p.size * 0.4, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `hsla(${p.hue}, 20%, 50%, 0.4)`;
+                ctx.lineWidth = p.size * 0.15;
+                ctx.stroke();
+            }
+            ctx.restore();
+        });
+
+        // Draw Stars
+        ctx.fillStyle = '#fcf069ff';
+        stars.forEach(s => {
+            ctx.globalAlpha = s.alpha;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
     } else {
         ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -891,7 +1034,7 @@ function draw() {
     }
 
     // Draw Power-ups
-    if (isPlaying) {
+    if (isPlaying || isGameOver) {
         for (const pu of powerUps) {
             ctx.save();
             ctx.translate(pu.x, pu.y);
@@ -937,12 +1080,12 @@ function draw() {
     }
 
     // Draw Players
-    if (isPlaying) {
+    if (isPlaying || isGameOver) {
         players.forEach(p => p.draw(ctx));
     }
 
     // Draw Enemies
-    if (isPlaying) {
+    if (isPlaying || isGameOver) {
         for (const e of enemies) {
             ctx.save();
             ctx.translate(e.x, e.y);
@@ -1052,7 +1195,7 @@ function draw() {
     }
 
     // Draw Enemy Bullets
-    if (isPlaying) {
+    if (isPlaying || isGameOver) {
         enemies.forEach(e => {
             if (e.bullets && e.bullets.length > 0) {
                 ctx.fillStyle = '#ff8800'; // Orange bullets
@@ -1071,7 +1214,6 @@ function gameLoop(timestamp) {
         const deltaTime = timestamp - lastTime;
         lastTime = timestamp;
 
-        update(deltaTime);
         update(deltaTime);
         draw(); // draw always
 
@@ -1171,7 +1313,7 @@ function spawnBoss() {
 
 function spawnPowerUp(type) {
     const x = Math.random() * (canvas.width - 60) + 30;
-    let color = '#ff0'; // Default yellow for side shooters
+    let color = 'rgba(0, 255, 42, 1)'; // Default green for side shooters
     if (type === 'life') color = '#f00'; // Red for life
     if (type === 'shield') color = '#0af'; // Cyan for shield
     powerUps.push({
