@@ -93,51 +93,21 @@ body {
     display: none;
 }
 
-/* Game Over Popup Style */
-#game-over-screen {
-    max-width: 500px;
-    padding: 30px 40px;
-    background: rgba(0, 0, 0, 0.98);
-    border: 3px solid #f0f;
-    box-shadow: 0 0 30px #f0f, inset 0 0 20px rgba(255, 0, 255, 0.3);
-}
-
-#game-over-screen h1 {
-    font-size: 48px;
-    color: #f0f;
-    text-shadow: 0 0 20px #f0f, 0 0 40px #f0f;
-    margin-bottom: 20px;
-}
-
-#game-over-screen p {
-    margin-bottom: 10px;
-    font-size: 20px;
-    color: #fff;
-    text-shadow: 0 0 10px #fff;
-}
-
-/* Pause Screen Style (Matching Game Over but Cyan) */
-#pause-screen {
-    max-width: 500px;
-    padding: 30px 40px;
-    background: rgba(0, 0, 0, 0.98);
-    border: 3px solid #0ff;
-    box-shadow: 0 0 30px #0ff, inset 0 0 20px rgba(0, 255, 255, 0.3);
-}
-
-#pause-screen h1 {
-    font-size: 48px;
-    color: #0ff;
-    text-shadow: 0 0 20px #0ff, 0 0 40px #0ff;
-    margin-bottom: 20px;
-}
-
-h1 {
-    font-size: 48px;
-    margin-bottom: 15px;
-    color: rgb(0, 140, 255);
-    text-shadow: 0 0 20px rgb(0, 140, 255), 0 0 40px rgb(0, 140, 255);
-    letter-spacing: 4px;
+/* Cyber HUD Popup Style (Game Over & Pause) */
+.cyber-popup {
+    max-width: 600px;
+    padding: 40px;
+    background: #0f1013;
+    border: 1px solid rgba(180, 255, 0, 0.2);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 50px rgba(180, 255, 0, 0.05);
+    border-radius: 0;
+    color: #b4ff00;
+    font-family: 'Outfit', sans-serif;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 /* Customization Panel */
@@ -239,78 +209,7 @@ h1 {
     margin-top: 20px;
 }
 
-/* Main Action Buttons - Enhanced Neon Style */
-#start-btn,
-#restart-btn,
-#home-btn,
-#resume-btn,
-#quit-btn {
-    padding: 15px 40px;
-    font-size: 24px;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 700;
-    background: transparent;
-    border: 3px solid #f0f;
-    color: #f0f;
-    cursor: pointer;
-    text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
-    box-shadow: 0 0 20px #f0f, 0 0 40px rgba(255, 0, 255, 0.5), inset 0 0 15px rgba(255, 0, 255, 0.2);
-    transition: all 0.3s ease;
-    margin-top: 20px;
-    border-radius: 8px;
-    letter-spacing: 2px;
-    pointer-events: auto;
-    position: relative;
-    overflow: hidden;
-}
-
-#start-btn::before,
-#restart-btn::before,
-#home-btn::before,
-#resume-btn::before,
-#quit-btn::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 0, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-}
-
-#start-btn:hover::before,
-#restart-btn:hover::before,
-#home-btn:hover::before,
-#resume-btn:hover::before,
-#quit-btn:hover::before {
-    width: 300px;
-    height: 300px;
-}
-
-#start-btn:hover,
-#restart-btn:hover,
-#home-btn:hover,
-#resume-btn:hover,
-#quit-btn:hover {
-    background: rgba(255, 0, 255, 0.3);
-    color: #fff;
-    box-shadow: 0 0 30px #f0f, 0 0 60px #f0f, 0 0 90px rgba(255, 0, 255, 0.5), inset 0 0 30px rgba(255, 0, 255, 0.4);
-    transform: scale(1.05) translateY(-3px);
-    text-shadow: 0 0 15px #fff, 0 0 25px #f0f, 0 0 35px #f0f;
-    border-color: #fff;
-}
-
-#start-btn:active,
-#restart-btn:active,
-#home-btn:active,
-#resume-btn:active,
-#quit-btn:active {
-    transform: scale(0.98) translateY(0);
-    box-shadow: 0 0 15px #f0f, 0 0 30px #f0f, inset 0 0 20px rgba(255, 0, 255, 0.5);
-}
+/* Old Action Buttons removed to use .hud-start-btn */
 
 /* Color and Shape Options Container */
 .color-options,
@@ -355,4 +254,291 @@ h1 {
 
 #pause-btn.hidden {
     display: none;
+}
+
+/* =========================================
+   CYBER HUD START SCREEN (Dark/Cyberpunk Style)
+   ========================================= */
+
+.screen.cyber-hud {
+    background: #0f1013;
+    /* Very dark blue/grey */
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    color: #b4ff00;
+    /* Neon yellow-green */
+    font-family: 'Outfit', sans-serif;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Base Pattern */
+.hud-bg-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: radial-gradient(rgba(180, 255, 0, 0.15) 1px, transparent 1px);
+    background-size: 20px 20px;
+    z-index: 0;
+    opacity: 0.5;
+}
+
+
+
+.hud-corner.top-left {
+    top: -20px;
+    left: -20px;
+    border-bottom-right-radius: 20px;
+}
+
+.hud-corner.bottom-right {
+    bottom: -20px;
+    right: -20px;
+    border-top-left-radius: 20px;
+}
+
+/* Text elements */
+.neon-star {
+    color: #b4ff00;
+    font-size: 1.2em;
+    vertical-align: middle;
+}
+
+.neon-star.large {
+    font-size: 2em;
+    font-weight: 700;
+    margin-right: 10px;
+}
+
+/* Layout */
+.hud-top-nav {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid rgba(180, 255, 0, 0.2);
+}
+
+.hud-coords {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #b4ff00;
+}
+
+.hud-center-zone {
+    position: relative;
+    z-index: 2;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 1px solid rgba(180, 255, 0, 0.2);
+    padding: 20px;
+}
+
+.cyber-circle {
+    width: 60px;
+    height: 60px;
+    border: 2px solid #00ff0d;
+    border-radius: 50%;
+    margin-bottom: 30px;
+    box-shadow: 0 0 20px rgba(180, 255, 0, 0.3);
+}
+
+.hud-main-text {
+    font-size: 90px;
+    font-weight: 800;
+    line-height: 0.85;
+    letter-spacing: -5px;
+    color: #b4ff00;
+    text-shadow: 0 0 30px rgba(180, 255, 0, 0.4);
+    text-align: center;
+    margin: 0 0 20px 0;
+    transform: scaleY(0.9);
+}
+
+.hud-subtitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #b4ff00;
+    opacity: 0.8;
+}
+
+.hud-panels {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    padding: 30px 40px;
+    gap: 40px;
+}
+
+.hud-panel {
+    flex: 1;
+    border: 1px solid rgba(180, 255, 0, 0.2);
+    background: rgba(15, 16, 19, 0.8);
+    padding: 20px;
+}
+
+.hud-panel-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b4ff00;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(180, 255, 0, 0.2);
+    padding-bottom: 10px;
+}
+
+.hud-panel-title span {
+    color: rgba(180, 255, 0, 0.5);
+    font-weight: 400;
+}
+
+.hud-options-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+.cyber-hud .hud-label {
+    font-size: 10px;
+    color: rgba(180, 255, 0, 0.6);
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+}
+
+/* Button overrides for HUD */
+.cyber-hud .shape-options,
+.cyber-hud .color-options {
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.cyber-hud .shape-select {
+    background: rgba(180, 255, 0, 0.05);
+    border: 1px solid rgba(180, 255, 0, 0.3);
+    color: #b4ff00;
+    font-size: 10px;
+    padding: 8px 12px;
+    border-radius: 0;
+    text-shadow: none;
+    box-shadow: none;
+    margin: 0;
+}
+
+.cyber-hud .shape-select:hover {
+    background: rgba(180, 255, 0, 0.2);
+    transform: none;
+}
+
+.cyber-hud .shape-select.selected {
+    background: #b4ff00;
+    color: #000;
+    border-color: #b4ff00;
+    font-weight: 700;
+}
+
+.cyber-hud .color-select {
+    width: 24px;
+    height: 24px;
+    border-radius: 0;
+    border: 1px solid rgba(180, 255, 0, 0.3);
+    margin: 0;
+    box-shadow: none;
+}
+
+.cyber-hud .color-select:hover {
+    transform: none;
+    border-color: #fff;
+}
+
+.cyber-hud .color-select.selected {
+    border: 2px solid #b4ff00;
+    transform: none;
+    box-shadow: 0 0 10px rgba(180, 255, 0, 0.5);
+}
+
+
+/* Bottom Bar */
+.hud-bottom-bar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-top: 1px solid rgba(180, 255, 0, 0.2);
+    background: rgba(15, 16, 19, 0.9);
+}
+
+.hud-bottom-left,
+.hud-bottom-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.hud-icons {
+    font-size: 14px;
+    color: #b4ff00;
+}
+
+.hud-start-btn {
+    background: transparent;
+    border: 2px solid #b4ff00;
+    color: #b4ff00;
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 15px 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.2s;
+    text-shadow: 0 0 10px rgba(180, 255, 0, 0.3);
+    box-shadow: 0 0 15px rgba(180, 255, 0, 0.1), inset 0 0 15px rgba(180, 255, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.hud-start-btn:hover {
+    background: #b4ff00;
+    color: #000;
+    box-shadow: 0 0 30px rgba(180, 255, 0, 0.5);
+    text-shadow: none;
+}
+
+.hud-start-btn::before,
+.hud-start-btn:hover::before {
+    display: none;
+    /* override earlier button rules */
+}
+
+.barcode {
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: #b4ff00;
+    opacity: 0.6;
 }
