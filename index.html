@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Space Shooter</title>
+    <!-- Add modern fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cyber_bar.css">
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="lives-board" class="hidden">
+            <!-- Player 1 HUD -->
+            <div class="player-hud p1-hud" id="p1-hud">
+                <div class="hud-wrapper">
+                    <!-- Left Side: Time/Lives Box -->
+                    <div class="hud-time-box">
+                        <div class="hud-time-content cyber-hp-dots">
+                            <span class="hud-big-val">03</span>
+                            <span class="hud-small-label">LIVES</span>
+                        </div>
+                        <div class="hud-slant-accents">
+                            <div class="accent-line"></div>
+                            <div class="accent-line"></div>
+                            <div class="accent-line-short"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Health Bar Box -->
+                    <div class="hud-bar-area">
+                        <div class="hud-health-bar-container state-high" id="p1-health-segments">
+                            <div class="hud-hp-bar-fill" id="p1-hp-fill" style="width: 100%;"></div>
+                            <div class="hud-player-tag">PLAYER 01</div>
+                        </div>
+                        <div class="hud-bottom-row">
+                            <div class="hud-energy-bar-container">
+                                <div class="hud-energy-bar-fill" id="p1-energy-bar" style="width: 0%;"></div>
+                            </div>
+                            <div class="hud-level-text">LEVEL <span id="p1-level">1</span> <span class="decor-dashes">---</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hud-extra-stats">
+                    <span class="kills-label" style="color: #0ff;">KILLS: <span id="p1-kills">0</span></span>
+                    <div class="timers-container">
+                        <div class="timer-wrapper" id="p1-shield-wrapper">
+                            <div class="timer-bar shield-bar" id="p1-shield-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p1-shooter-wrapper">
+                            <div class="timer-bar shooter-bar" id="p1-shooter-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 2 HUD -->
+            <div class="player-hud p2-hud" id="p2-hud">
+                <div class="hud-wrapper">
+                    <!-- Left Side: Time/Lives Box -->
+                    <div class="hud-time-box">
+                        <div class="hud-time-content cyber-hp-dots">
+                            <span class="hud-big-val">03</span>
+                            <span class="hud-small-label">LIVES</span>
+                        </div>
+                        <div class="hud-slant-accents">
+                            <div class="accent-line"></div>
+                            <div class="accent-line"></div>
+                            <div class="accent-line-short"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Health Bar Box -->
+                    <div class="hud-bar-area">
+                        <div class="hud-health-bar-container state-high" id="p2-health-segments">
+                            <div class="hud-hp-bar-fill" id="p2-hp-fill" style="width: 100%;"></div>
+                            <div class="hud-player-tag">PLAYER 02</div>
+                        </div>
+                        <div class="hud-bottom-row">
+                            <div class="hud-energy-bar-container">
+                                <div class="hud-energy-bar-fill" id="p2-energy-bar" style="width: 0%;"></div>
+                            </div>
+                            <div class="hud-level-text">LEVEL <span id="p2-level">1</span> <span class="decor-dashes">---</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hud-extra-stats">
+                    <span class="kills-label" style="color: #f00;">KILLS: <span id="p2-kills">0</span></span>
+                    <div class="timers-container">
+                        <div class="timer-wrapper" id="p2-shield-wrapper">
+                            <div class="timer-bar shield-bar" id="p2-shield-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p2-shooter-wrapper">
+                            <div class="timer-bar shooter-bar" id="p2-shooter-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="pause-btn" class="hidden">||</button>
+
+        <!-- CyberHUD Start Screen -->
+        <div id="start-screen" class="screen active cyber-hud">
+            <!-- Background grids and decorations -->
+            <div class="hud-bg-pattern"></div>
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner bottom-right"></div>
+
+            <div class="hud-top-nav">
+                <span class="hud-coords"></span>
+                <span class="hud-coords pull-right"></span>
+            </div>
+
+            <div class="hud-center-zone">
+                <div class="black-hole-container">
+                    <div class="nebula-swirl purple"></div>
+                    <div class="nebula-swirl orange"></div>
+                    <div class="black-hole"></div>
+                    <div class="accretion-disk"></div>
+                    <div class="event-horizon"></div>
+                </div>
+                <h1 class="hud-main-text">NEON<br>SHOOTER</h1>
+                <div class="hud-subtitle">A TYPOGRAPHY EXPERIMENT 02 <span class="neon-star">*</span> LOGOTYPE “BRUTE”
+                </div>
+            </div>
+
+            <div class="hud-panels">
+                <!-- Player 1 -->
+                <div class="hud-panel p1-panel">
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 01 <span>[WASD+SPACE]</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="ship-preview-box">
+                            <canvas class="ship-preview-canvas" id="p1-ship-preview" width="160" height="160"></canvas>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="1" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="1" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="1" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="1" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="1" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="1" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="1" data-shape="titan">Titan</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                <button class="color-select" data-player="1" data-color="#849c38"
+                                    style="background-color: #849c38;"></button>
+                                <button class="color-select" data-player="1" data-color="#1c2c48"
+                                    style="background-color: #1c2c48;"></button>
+                                <button class="color-select" data-player="1" data-color="#91211c"
+                                    style="background-color: #91211c;"></button>
+                                <button class="color-select" data-player="1" data-color="#96794a"
+                                    style="background-color: #96794a;"></button>
+                                <button class="color-select" data-player="1" data-color="#dbd0c4"
+                                    style="background-color: #dbd0c4;"></button>
+                                <button class="color-select" data-player="1" data-color="#505c75"
+                                    style="background-color: #505c75;"></button>
+                                <button class="color-select" data-player="1" data-color="#d37436"
+                                    style="background-color: #d37436;"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player 2 -->
+                <div class="hud-panel p2-panel">
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 02 <span>[ARROWS+ENTER]</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="ship-preview-box">
+                            <canvas class="ship-preview-canvas" id="p2-ship-preview" width="160" height="160"></canvas>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="2" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="2" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="2" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="2" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="2" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="2" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="2" data-shape="titan">Titan</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                <button class="color-select" data-player="2" data-color="#849c38"
+                                    style="background-color: #849c38;"></button>
+                                <button class="color-select" data-player="2" data-color="#1c2c48"
+                                    style="background-color: #1c2c48;"></button>
+                                <button class="color-select" data-player="2" data-color="#91211c"
+                                    style="background-color: #91211c;"></button>
+                                <button class="color-select" data-player="2" data-color="#96794a"
+                                    style="background-color: #96794a;"></button>
+                                <button class="color-select" data-player="2" data-color="#dbd0c4"
+                                    style="background-color: #dbd0c4;"></button>
+                                <button class="color-select" data-player="2" data-color="#505c75"
+                                    style="background-color: #505c75;"></button>
+                                <button class="color-select" data-player="2" data-color="#d37436"
+                                    style="background-color: #d37436;"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-bottom-bar">
+                <div class="hud-bottom-left">
+                    <span class="neon-star large">02</span>
+                    <span class="hud-icons">CE ♲ ☣</span>
+                    <span class="hud-coords">42.6629° N</span>
+                </div>
+
+                <button id="start-btn" class="hud-start-btn">
+                    <span>INITIALIZE</span>
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                    </svg>
+                </button>
+
+                <div class="hud-bottom-right">
+                    <span class="hud-coords">21.1655° E</span>
+                    <div class="barcode">|||| ||| | ||</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="rhombus-screen hidden">
+            <div class="rhombus-container">
+                <h1 class="rhombus-title">GAME OVER</h1>
+                <div class="rhombus-button-group">
+                    <button id="restart-btn" class="rhombus-btn">RETRY</button>
+                    <button id="home-btn" class="rhombus-btn">HOME</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="pause-screen" class="rhombus-screen hidden">
+            <div class="rhombus-container">
+                <h1 class="rhombus-title">PAUSE</h1>
+                <div class="rhombus-button-group">
+                    <button id="resume-btn" class="rhombus-btn">CONTINUE</button>
+                    <button id="quit-btn" class="rhombus-btn">HOME</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="game.js"></script>
+</body>
+
+</html>
