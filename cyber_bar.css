@@ -5,13 +5,13 @@
 :root {
     --color-high: #00d2ff;
     --color-high-rgb: 0, 210, 255;
-    
+
     --color-warning: #ebd234;
     --color-warning-rgb: 235, 210, 52;
-    
+
     --color-danger: #ff3b30;
     --color-danger-rgb: 255, 59, 48;
-    
+
     --color-gold: #ebd234;
     --color-gold-rgb: 235, 210, 52;
 }
@@ -155,8 +155,8 @@
     background: rgba(5, 5, 10, 0.85);
     position: relative;
     border: 2px solid var(--hud-status-color);
-    box-shadow: 
-        0 0 12px rgba(var(--hud-status-color-rgb), 0.25), 
+    box-shadow:
+        0 0 12px rgba(var(--hud-status-color-rgb), 0.25),
         inset 0 0 10px rgba(var(--hud-status-color-rgb), 0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 2;
@@ -219,7 +219,7 @@
     color: #fff;
     letter-spacing: 1.5px;
     z-index: 5;
-    box-shadow: inset 0 0 4px rgba(255,255,255,0.1);
+    box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.1);
     transition: border-color 0.3s ease;
 }
 
@@ -227,14 +227,16 @@
     left: 15px;
     border-right: 2px solid var(--hud-status-color);
     border-left: 2px solid var(--hud-status-color);
-    transform: skewX(20deg); /* un-skew text */
+    transform: skewX(20deg);
+    /* un-skew text */
 }
 
 .p2-hud .hud-player-tag {
     right: 15px;
     border-left: 2px solid var(--hud-status-color);
     border-right: 2px solid var(--hud-status-color);
-    transform: skewX(-20deg); /* un-skew text */
+    transform: skewX(-20deg);
+    /* un-skew text */
 }
 
 /* --------------------------------------------------------------------------
@@ -296,7 +298,8 @@
 }
 
 .p1-hud .hud-level-text {
-    transform: skewX(0deg); /* Keep text stable */
+    transform: skewX(0deg);
+    /* Keep text stable */
 }
 
 .p2-hud .hud-level-text {
