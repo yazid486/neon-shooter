@@ -8,6 +8,8 @@ let isGameOver = false;
 let isPlaying = false;
 let isPaused = false;
 let gameOverTimeout;
+let playerMode = 2; // 1 = 1 Player, 2 = 2 Players
+const MAX_ENEMIES = 20;
 
 // Input State
 const keys = {};
@@ -44,6 +46,14 @@ class Player {
         this.kills = 0;
         this.hasShield = false;
         this.shieldEndTime = 0;
+
+        // Touch control state (mobile): when touchActive is true, this
+        // player follows touchTargetX/Y instead of using keys, and fires
+        // continuously while the finger is down.
+        this.touchActive = false;
+        this.touchId = null;
+        this.touchTargetX = x;
+        this.touchTargetY = y;
     }
 
     update(deltaTime) {
@@ -67,37 +77,53 @@ class Player {
         // Movement Physics
         let dx = 0;
         let dy = 0;
-
-        if (keys[this.controls.up]) dy -= 1;
-        if (keys[this.controls.down]) dy += 1;
-        if (keys[this.controls.left]) dx -= 1;
-        if (keys[this.controls.right]) dx += 1;
-
-        // Normalize Input
-        if (dx !== 0 || dy !== 0) {
-            const length = Math.sqrt(dx * dx + dy * dy);
-            dx /= length;
-            dy /= length;
-
-            this.vx += dx * this.acceleration;
-            this.vy += dy * this.acceleration;
-        }
-
-        // Apply Friction
-        this.vx *= this.friction;
-        this.vy *= this.friction;
-
-        // Clamp Speed
-        const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         const maxSpeed = 5.5;
-        if (currentSpeed > maxSpeed) {
-            this.vx = (this.vx / currentSpeed) * maxSpeed;
-            this.vy = (this.vy / currentSpeed) * maxSpeed;
-        }
 
-        // Apply Velocity
-        this.x += this.vx;
-        this.y += this.vy;
+        if (this.touchActive) {
+            // Touch control: ease the ship toward the finger position.
+            // Using a lerp instead of the keyboard's accel/friction model
+            // keeps tracking tight and responsive, the way players expect
+            // a "follow my finger" shooter to feel.
+            const followLerp = 0.28;
+            const prevX = this.x;
+            const prevY = this.y;
+            this.x += (this.touchTargetX - this.x) * followLerp;
+            this.y += (this.touchTargetY - this.y) * followLerp;
+            // Derive a pseudo-velocity so the existing tilt/trail effects
+            // (which read this.vx/this.vy) still work under touch control.
+            this.vx = this.x - prevX;
+            this.vy = this.y - prevY;
+        } else {
+            if (keys[this.controls.up]) dy -= 1;
+            if (keys[this.controls.down]) dy += 1;
+            if (keys[this.controls.left]) dx -= 1;
+            if (keys[this.controls.right]) dx += 1;
+
+            // Normalize Input
+            if (dx !== 0 || dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx /= length;
+                dy /= length;
+
+                this.vx += dx * this.acceleration;
+                this.vy += dy * this.acceleration;
+            }
+
+            // Apply Friction
+            this.vx *= this.friction;
+            this.vy *= this.friction;
+
+            // Clamp Speed
+            const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+            if (currentSpeed > maxSpeed) {
+                this.vx = (this.vx / currentSpeed) * maxSpeed;
+                this.vy = (this.vy / currentSpeed) * maxSpeed;
+            }
+
+            // Apply Velocity
+            this.x += this.vx;
+            this.y += this.vy;
+        }
 
         // Calculate Tilt logic
         const targetTilt = (this.vx / maxSpeed) * this.maxTilt;
@@ -127,8 +153,8 @@ class Player {
             this.trail.shift();
         }
 
-        // Shooting
-        if (keys[this.controls.shoot]) {
+        // Shooting (keyboard shoot key OR finger held down on screen)
+        if (keys[this.controls.shoot] || this.touchActive) {
             const now = performance.now();
             if (now - this.lastShot > this.shootDelay) {
                 // Main bullet
@@ -183,8 +209,8 @@ class Player {
     draw(ctx) {
         if (!this.isAlive) return;
 
-        // Draw Trail
-        if (this.trail.length > 1) {
+        // Draw Trail (disabled)
+        if (false && this.trail.length > 1 && this.shape !== 'vintage') {
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -274,6 +300,10 @@ class Player {
         this.kills = 0;
         this.hasShield = false;
         this.shieldEndTime = 0;
+        this.touchActive = false;
+        this.touchId = null;
+        this.touchTargetX = x;
+        this.touchTargetY = y;
         // state persists across resets
     }
 
@@ -339,14 +369,15 @@ let gameOverScreen;
 let pauseScreen;
 let pauseBtn;
 let livesBoard;
+let p2Hud;
 let shipPreviewCanvases = {};
 // Initialize Players
 function initPlayers() {
     players = [
-        new Player(canvas.width / 3, canvas.height - 100, '#1c2c48', {
+        new Player(canvas.width / 3, canvas.height - 100, '#5D9CEC', {
             up: 'w', down: 's', left: 'a', right: 'd', shoot: ' '
         }, 1),
-        new Player(2 * canvas.width / 3, canvas.height - 100, '#91211c', {
+        new Player(2 * canvas.width / 3, canvas.height - 100, '#ED5565', {
             up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shoot: 'Enter'
         }, 2)
     ];
@@ -455,6 +486,7 @@ function initGame() {
         pauseScreen = document.getElementById('pause-screen');
         pauseBtn = document.getElementById('pause-btn');
         livesBoard = document.getElementById('lives-board');
+        p2Hud = document.getElementById('p2-hud');
         shipPreviewCanvases = {
             1: document.getElementById('p1-ship-preview'),
             2: document.getElementById('p2-ship-preview')
@@ -465,14 +497,34 @@ function initGame() {
 
         // Resize Canvas
         function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+
+            // On phones, render at a larger internal resolution than the
+            // screen actually is, then let CSS scale it back down to fit.
+            // This effectively "zooms out", giving a bigger play area to
+            // move around in instead of feeling cramped on a small screen.
+            // Touch input already converts back via toCanvasCoords().
+            const isMobile = w <= 700;
+            const playAreaScale = isMobile ? 1.4 : 1;
+
+            canvas.width = w * playAreaScale;
+            canvas.height = h * playAreaScale;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
 
             if (!isPlaying && players.length > 0) {
-                players[0].x = canvas.width / 3;
-                players[0].y = canvas.height - 100;
-                players[1].x = 2 * canvas.width / 3;
-                players[1].y = canvas.height - 100;
+                if (playerMode === 1) {
+                    players[0].x = canvas.width / 2;
+                    players[0].y = canvas.height - 100;
+                } else {
+                    players[0].x = canvas.width / 3;
+                    players[0].y = canvas.height - 100;
+                    if (players[1]) {
+                        players[1].x = 2 * canvas.width / 3;
+                        players[1].y = canvas.height - 100;
+                    }
+                }
             }
         }
         window.addEventListener('resize', resize);
@@ -497,10 +549,8 @@ function initGame() {
             if (e.code === 'Space' || e.key === ' ') keys[' '] = true;
             if (e.code === 'Enter') keys['Enter'] = true;
 
-            if (e.code === 'Space' && !isPlaying && !isGameOver) {
+            if (e.code === 'Space' && !isPlaying && !isGameOver && startScreen && startScreen.classList.contains('active')) {
                 startGame();
-            } else if (e.code === 'Space' && isGameOver) {
-                resetGame();
             }
 
 
@@ -519,15 +569,120 @@ function initGame() {
             if (e.code === 'Enter') keys['Enter'] = false;
         });
 
+        // ─── Touch Controls (mobile) ──────────────────────────────
+        // While playing: holding a finger down moves that player's ship
+        // toward the finger and fires continuously. In 2-player mode the
+        // canvas is split into a left half (Player 1) and right half
+        // (Player 2) so two fingers can control both ships independently.
+        function toCanvasCoords(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function pickPlayerForTouch(canvasX) {
+            if (playerMode === 1) return players[0];
+            return canvasX < canvas.width / 2 ? players[0] : players[1];
+        }
+
+        function handleTouchStart(e) {
+            if (!isPlaying || isPaused || isGameOver) return;
+            for (const touch of Array.from(e.changedTouches)) {
+                // Let real UI buttons (pause, etc.) keep working normally.
+                if (touch.target && touch.target.closest && touch.target.closest('button')) continue;
+
+                const pos = toCanvasCoords(touch.clientX, touch.clientY);
+                const player = pickPlayerForTouch(pos.x);
+                if (!player || !player.isAlive || player.touchId !== null) continue;
+
+                player.touchId = touch.identifier;
+                player.touchActive = true;
+                player.touchTargetX = pos.x;
+                player.touchTargetY = pos.y;
+                e.preventDefault();
+            }
+        }
+
+        function handleTouchMove(e) {
+            if (!isPlaying || isPaused || isGameOver) return;
+            for (const touch of Array.from(e.changedTouches)) {
+                const player = players.find(p => p.touchId === touch.identifier);
+                if (!player) continue;
+                const pos = toCanvasCoords(touch.clientX, touch.clientY);
+                player.touchTargetX = pos.x;
+                player.touchTargetY = pos.y;
+                e.preventDefault();
+            }
+        }
+
+        function handleTouchEnd(e) {
+            for (const touch of Array.from(e.changedTouches)) {
+                const player = players.find(p => p.touchId === touch.identifier);
+                if (!player) continue;
+                player.touchActive = false;
+                player.touchId = null;
+            }
+        }
+
+        window.addEventListener('touchstart', handleTouchStart, { passive: false });
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleTouchEnd, { passive: false });
+        window.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
         // Customization Logic
+        function updateColorUI() {
+            // Reset all selected & disabled classes first
+            document.querySelectorAll('.color-select').forEach(b => {
+                b.classList.remove('selected', 'disabled');
+                b.style.opacity = '1';
+                b.style.cursor = 'pointer';
+            });
+
+            // Mark current choices as selected
+            document.querySelector(`.color-select[data-player="1"][data-color="${players[0].color}"]`)?.classList.add('selected');
+            if (playerMode === 2) {
+                document.querySelector(`.color-select[data-player="2"][data-color="${players[1].color}"]`)?.classList.add('selected');
+
+                // Mark Player 2's chosen color as disabled on Player 1's side
+                const p1TakenBtn = document.querySelector(`.color-select[data-player="1"][data-color="${players[1].color}"]`);
+                if (p1TakenBtn) {
+                    p1TakenBtn.classList.add('disabled');
+                    p1TakenBtn.style.opacity = '0.22';
+                    p1TakenBtn.style.cursor = 'not-allowed';
+                }
+
+                // Mark Player 1's chosen color as disabled on Player 2's side
+                const p2TakenBtn = document.querySelector(`.color-select[data-player="2"][data-color="${players[0].color}"]`);
+                if (p2TakenBtn) {
+                    p2TakenBtn.classList.add('disabled');
+                    p2TakenBtn.style.opacity = '0.22';
+                    p2TakenBtn.style.cursor = 'not-allowed';
+                }
+            }
+        }
+
         document.querySelectorAll('.color-select').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const color = e.target.dataset.color;
                 const playerId = parseInt(e.target.dataset.player);
                 const player = players.find(p => p.id === playerId);
-                if (player) player.color = color;
-                document.querySelectorAll(`.color-select[data-player="${playerId}"]`).forEach(b => b.classList.remove('selected'));
-                e.target.classList.add('selected');
+                if (!player) return;
+
+                // Prevent both players from having the same color in 2-player mode (ignore selection)
+                if (playerMode === 2) {
+                    const otherPlayerId = playerId === 1 ? 2 : 1;
+                    const otherPlayer = players.find(p => p.id === otherPlayerId);
+                    if (otherPlayer && otherPlayer.color === color) {
+                        return; // Ignore selection
+                    }
+                }
+
+                player.color = color;
+                updateColorUI();
                 drawShipPreview(playerId);
             });
         });
@@ -566,10 +721,37 @@ function initGame() {
         if (resumeBtn) resumeBtn.addEventListener('click', togglePause);
         if (quitBtn) quitBtn.addEventListener('click', goHome);
 
+        // Mode Selector Logic
+        function setPlayerMode(mode) {
+            playerMode = mode;
+            document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
+
+            const selectedOpt = document.getElementById(`mode-${mode}p`);
+            if (selectedOpt) selectedOpt.classList.add('selected');
+
+            const p2Panel = document.querySelector('.p2-panel');
+            if (playerMode === 1) {
+                if (p2Panel) p2Panel.classList.add('inactive');
+            } else {
+                if (p2Panel) p2Panel.classList.remove('inactive');
+            }
+            updateColorUI(); // Update taken colors when mode changes
+        }
+
+        document.querySelectorAll('.mode-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const opt = e.currentTarget;
+                const mode = parseInt(opt.dataset.mode);
+                setPlayerMode(mode);
+            });
+        });
+
+        // Initialize mode
+        setPlayerMode(playerMode);
 
         // Initialize selection UI
+        updateColorUI();
         players.forEach(p => {
-            document.querySelector(`.color-select[data-player="${p.id}"][data-color="${p.color}"]`)?.classList.add('selected');
             document.querySelector(`.shape-select[data-player="${p.id}"][data-shape="${p.shape}"]`)?.classList.add('selected');
         });
         updateShipPreviews();
@@ -616,15 +798,24 @@ function startGame() {
         isGameOver = false;
         isPaused = false;
         if (startScreen) {
-            if (startScreen) {
-                startScreen.classList.remove('active');
-                startScreen.classList.add('hidden');
-            }
+            startScreen.classList.remove('active');
+            startScreen.classList.add('hidden');
             if (gameOverScreen) gameOverScreen.classList.add('hidden');
 
             // Reset entities
-            players[0].reset(canvas.width / 3, canvas.height - 100);
-            players[1].reset(2 * canvas.width / 3, canvas.height - 100);
+            if (playerMode === 1) {
+                players[0].reset(canvas.width / 2, canvas.height - 100);
+                players[1].reset(2 * canvas.width / 3, canvas.height - 100);
+                players[1].isAlive = false;
+                players[1].lives = 0;
+
+                if (p2Hud) p2Hud.classList.add('hidden');
+            } else {
+                players[0].reset(canvas.width / 3, canvas.height - 100);
+                players[1].reset(2 * canvas.width / 3, canvas.height - 100);
+
+                if (p2Hud) p2Hud.classList.remove('hidden');
+            }
             updateLivesDisplay();
             updateKillsDisplay();
 
@@ -766,10 +957,13 @@ function update(deltaTime) {
         return;
     }
 
-    // Spawn Enemies
+    // Spawn Enemies (Only if no Boss is active)
     enemySpawnTimer += deltaTime;
     if (enemySpawnTimer > enemySpawnInterval) {
-        spawnEnemy();
+        const isBossActive = enemies.some(e => e.isBoss);
+        if (enemies.length < MAX_ENEMIES && !isBossActive) {
+            spawnEnemy();
+        }
         enemySpawnTimer = 0;
         if (enemySpawnInterval > 900) enemySpawnInterval -= 5;
     }
@@ -860,6 +1054,7 @@ function update(deltaTime) {
 
         // Collision with Bullets
         for (const p of players) {
+            if (!p.isAlive) continue;
             for (let j = p.bullets.length - 1; j >= 0; j--) {
                 const b = p.bullets[j];
                 if (checkCollision(b, e)) {
@@ -928,25 +1123,28 @@ function update(deltaTime) {
             updateEnemyBullets(e);
         }
 
-        // Boss Shooting Logic
+        // Boss Shooting Logic: 10 Spreading Shots every 3 seconds (shootDelay = 3000)
         if (e.isBoss && isPlaying) {
             const now = performance.now();
             if (now - e.lastShot > e.shootDelay) {
                 e.lastShot = now;
-                // 10 shots/sec = 100ms delay. shootDelay set in spawnBoss.
 
-                // Dual cannons
-                [-20, 20].forEach(offset => {
+                const baseSpeed = 5.5;
+                const angles = Array.from({ length: 10 }, (_, i) => -0.5 + i * (1.0 / 9)); // 10 angles from -0.5 to +0.5 rad
+
+                angles.forEach(angle => {
                     e.bullets.push({
-                        x: e.x + offset,
-                        y: e.y + e.height / 2 + 10, // Center of bullet (height 20)
+                        x: e.x,
+                        y: e.y + e.height / 2 + 10,
                         width: 8,
                         height: 20,
-                        speed: 8,
+                        vx: baseSpeed * Math.sin(angle),
+                        vy: baseSpeed * Math.cos(angle),
+                        speed: baseSpeed,
                         color: '#ff0000'
                     });
-                    createMuzzleFlash(e.x + offset, e.y + e.height / 2, '#ff0000');
                 });
+                createMuzzleFlash(e.x, e.y + e.height / 2, '#ff0000');
             }
             updateEnemyBullets(e);
         }
@@ -984,7 +1182,14 @@ function update(deltaTime) {
 function updateEnemyBullets(e) {
     for (let bIndex = e.bullets.length - 1; bIndex >= 0; bIndex--) {
         const bullet = e.bullets[bIndex];
-        bullet.y += bullet.speed;
+        if (bullet.vx !== undefined) {
+            bullet.x += bullet.vx;
+        }
+        if (bullet.vy !== undefined) {
+            bullet.y += bullet.vy;
+        } else {
+            bullet.y += bullet.speed;
+        }
 
         // Check collision with players
         players.forEach(p => {
@@ -1002,8 +1207,9 @@ function updateEnemyBullets(e) {
             }
         });
 
-        // Remove off-screen bullets
-        if (bullet.y > ((canvas && canvas.height) || window.innerHeight) + 50) {
+        // Remove off-screen bullets (check bounds for spreading angles)
+        if (bullet.y > ((canvas && canvas.height) || window.innerHeight) + 50 ||
+            bullet.x < -50 || (canvas && bullet.x > canvas.width + 50)) {
             e.bullets.splice(bIndex, 1);
         }
     }
@@ -1152,94 +1358,254 @@ function draw() {
             // Draw Enemy Shape (Alien Ship)
             ctx.beginPath();
             if (e.isBoss) {
-                // Apex Fang Dreadnought (Based on User Design)
+                // Cyber Dragon Mech Boss (Based on User's Winged Mech Sketch)
                 const w = e.width;
                 const h = e.height;
 
-                // --- 1. Base Structural Hull (Dark Metal) ---
-                ctx.fillStyle = '#111';
-                ctx.beginPath();
-                ctx.moveTo(-w * 0.4, -h * 0.1);
-                ctx.lineTo(w * 0.4, -h * 0.1);
-                ctx.lineTo(w * 0.45, h * 0.2);
-                ctx.lineTo(0, h * 0.45);
-                ctx.lineTo(-w * 0.45, h * 0.2);
-                ctx.closePath();
-                ctx.fill();
-
-                // --- 2. Massive Apex Fangs (Railgun/Claws) ---
-                const drawFang = (side) => {
-                    ctx.fillStyle = '#1a1a1a';
+                // Helper for filled polygons
+                const poly = (pts, fillColor, strokeColor, strokeWidth = 1) => {
                     ctx.beginPath();
-                    ctx.moveTo(side * w * 0.15, h * 0.1); // Root
-                    ctx.lineTo(side * w * 0.35, h * 0.15); // Outer root
-                    ctx.lineTo(side * w * 0.5, -h * 0.4);  // Blade mid
-                    ctx.lineTo(side * w * 0.3, -h * 0.65); // Sharp point
-                    ctx.lineTo(side * w * 0.18, -h * 0.3); // Inner edge
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.strokeStyle = '#222';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-
-                    // Glowing Blue Energy Rails / Vents
-                    ctx.fillStyle = '#08f';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = '#08f';
-                    for (let i = 0; i < 4; i++) {
-                        ctx.fillRect(side * w * 0.36 - (side * i * w * 0.03), -h * 0.1 - (i * h * 0.12), side * w * 0.06, h * 0.02);
+                    ctx.moveTo(pts[0].x, pts[0].y);
+                    for (let i = 1; i < pts.length; i++) {
+                        ctx.lineTo(pts[i].x, pts[i].y);
                     }
-                    ctx.shadowBlur = 0;
+                    ctx.closePath();
+                    if (fillColor) {
+                        ctx.fillStyle = fillColor;
+                        ctx.fill();
+                    }
+                    if (strokeColor) {
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.stroke();
+                    }
                 };
-                drawFang(1);  // Right
-                drawFang(-1); // Left
 
-                // --- 3. Heavy Layered Armor (Orange/Brown) ---
-                ctx.fillStyle = '#840'; // Burnt Orange
-                ctx.beginPath();
-                ctx.moveTo(-w * 0.25, -h * 0.2);
-                ctx.lineTo(w * 0.25, -h * 0.2);
-                ctx.lineTo(w * 0.4, h * 0.1);
-                ctx.lineTo(w * 0.2, h * 0.4);
-                ctx.lineTo(-w * 0.2, h * 0.4);
-                ctx.lineTo(-w * 0.4, h * 0.1);
-                ctx.closePath();
-                ctx.fill();
+                // Helper for lines
+                const line = (pts, strokeColor, lineWidth = 1.5) => {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0].x, pts[0].y);
+                    for (let i = 1; i < pts.length; i++) {
+                        ctx.lineTo(pts[i].x, pts[i].y);
+                    }
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = lineWidth;
+                    ctx.stroke();
+                };
 
-                // Central Nose Structure
-                ctx.fillStyle = '#520';
-                ctx.beginPath();
-                ctx.moveTo(-w * 0.06, -h * 0.2);
-                ctx.lineTo(w * 0.06, -h * 0.2);
-                ctx.lineTo(w * 0.1, h * 0.4);
-                ctx.lineTo(-w * 0.1, h * 0.4);
-                ctx.closePath();
-                ctx.fill();
+                // Styles
+                const bossColor = e.color || '#ff0000'; // Neon red
+                const darkMetal = '#0e0f12';
+                const midMetal = '#1f232b';
+                const lightMetal = '#39404f';
+                const panelLineColor = 'rgba(255, 255, 255, 0.18)';
+                const glowGlow = (glowColor, blur = 15) => {
+                    ctx.shadowBlur = blur;
+                    ctx.shadowColor = glowColor;
+                };
 
-                // --- 4. Central Core & Bridge ---
-                ctx.fillStyle = '#080808';
-                ctx.beginPath();
-                ctx.arc(0, 0, w * 0.16, 0, Math.PI * 2);
-                ctx.fill();
+                // 1. Ribbed Shoulder Engines (Background details)
+                // Left & Right ribbed intakes
+                for (let side of [-1, 1]) {
+                    // Engine Block background
+                    poly([
+                        { x: side * w * 0.05, y: -h * 0.1 },
+                        { x: side * w * 0.22, y: -h * 0.12 },
+                        { x: side * w * 0.22, y: -h * 0.28 },
+                        { x: side * w * 0.05, y: -h * 0.25 }
+                    ], darkMetal, bossColor, 1);
 
-                // Pulsing Energy Heart
-                const pulse = 0.5 + Math.sin(performance.now() / 200) * 0.5;
-                ctx.fillStyle = `rgba(255, 0, 0, ${0.3 + pulse * 0.7})`;
-                ctx.shadowBlur = 20 * pulse;
-                ctx.shadowColor = '#f00';
-                ctx.beginPath();
-                ctx.arc(0, 0, w * 0.08, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 5;
+                    // Draw Ribs
+                    ctx.save();
+                    glowGlow(bossColor, 5);
+                    for (let i = 0; i < 5; i++) {
+                        const ry = -h * 0.13 - i * h * 0.03;
+                        line([
+                            { x: side * w * 0.07, y: ry },
+                            { x: side * w * 0.20, y: ry - h * 0.01 }
+                        ], bossColor, 2);
+                    }
+                    ctx.restore();
+                }
 
-                // Command Bridge Detail
-                ctx.fillStyle = '#111';
+                // 2. Central Tail / Vertical Stabilizer (Behind body)
+                // Main stabilizer pointing up
+                poly([
+                    { x: -w * 0.03, y: -h * 0.1 },
+                    { x: w * 0.03, y: -h * 0.1 },
+                    { x: w * 0.015, y: -h * 0.45 },
+                    { x: 0, y: -h * 0.72 }, // Tip
+                    { x: -w * 0.015, y: -h * 0.45 }
+                ], midMetal, bossColor, 1.5);
+
+                // Central crease line
+                line([
+                    { x: 0, y: -h * 0.1 },
+                    { x: 0, y: -h * 0.7 }
+                ], panelLineColor, 1);
+
+                // 3. Downward stabilizers / Lower legs
+                for (let side of [-1, 1]) {
+                    poly([
+                        { x: side * w * 0.14, y: h * 0.05 },
+                        { x: side * w * 0.26, y: h * 0.08 },
+                        { x: side * w * 0.28, y: h * 0.42 }, // outer tip
+                        { x: side * w * 0.22, y: h * 0.44 }, // point
+                        { x: side * w * 0.08, y: h * 0.20 }
+                    ], darkMetal, bossColor, 1.5);
+
+                    // Panel lines inside legs
+                    line([
+                        { x: side * w * 0.18, y: h * 0.12 },
+                        { x: side * w * 0.24, y: h * 0.38 }
+                    ], panelLineColor, 1);
+                }
+
+                // 4. Center Body / Chassis Pod
+                // Large hexagonal/curved central chassis
+                poly([
+                    { x: -w * 0.15, y: -h * 0.12 },
+                    { x: w * 0.15, y: -h * 0.12 },
+                    { x: w * 0.26, y: -h * 0.02 },
+                    { x: w * 0.22, y: h * 0.14 },
+                    { x: 0, y: h * 0.22 },
+                    { x: -w * 0.22, y: h * 0.14 },
+                    { x: -w * 0.26, y: -h * 0.02 }
+                ], darkMetal, bossColor, 2);
+
+                // Internal panel lines on body
+                line([
+                    { x: -w * 0.1, y: -h * 0.08 },
+                    { x: w * 0.1, y: -h * 0.08 }
+                ], panelLineColor, 1);
+                line([
+                    { x: -w * 0.15, y: h * 0.06 },
+                    { x: -w * 0.05, y: h * 0.15 }
+                ], panelLineColor, 1);
+                line([
+                    { x: w * 0.15, y: h * 0.06 },
+                    { x: w * 0.05, y: h * 0.15 }
+                ], panelLineColor, 1);
+
+                // Small horizontal grates/slats above core (matching sketch)
+                for (let i = 0; i < 2; i++) {
+                    const gy = -h * 0.05 + i * h * 0.03;
+                    poly([
+                        { x: -w * 0.08, y: gy },
+                        { x: w * 0.08, y: gy },
+                        { x: w * 0.07, y: gy + h * 0.015 },
+                        { x: -w * 0.07, y: gy + h * 0.015 }
+                    ], midMetal, bossColor, 1);
+                }
+
+                // 5. Pointed Bottom Fuselage & Canopy
+                // Fuselage pointing down
+                poly([
+                    { x: -w * 0.07, y: h * 0.15 },
+                    { x: w * 0.07, y: h * 0.15 },
+                    { x: w * 0.05, y: h * 0.38 },
+                    { x: 0, y: h * 0.62 }, // sharp tip
+                    { x: -w * 0.05, y: h * 0.38 }
+                ], midMetal, bossColor, 1.5);
+
+                // Central line along nose
+                line([
+                    { x: 0, y: h * 0.15 },
+                    { x: 0, y: h * 0.58 }
+                ], panelLineColor, 1);
+
+                // Glowing Cockpit/Canopy (Cyan neon glass)
+                ctx.save();
+                glowGlow('#0ff', 12);
+                poly([
+                    { x: 0, y: h * 0.28 },
+                    { x: w * 0.03, y: h * 0.35 },
+                    { x: 0, y: h * 0.44 },
+                    { x: -w * 0.03, y: h * 0.35 }
+                ], 'rgba(0, 240, 255, 0.4)', '#0ff', 2);
+                ctx.restore();
+
+                // 6. Central Reactor / Core
+                // Outer ring
                 ctx.beginPath();
-                ctx.ellipse(0, -h * 0.05, w * 0.1, h * 0.04, 0, 0, Math.PI * 2);
+                ctx.arc(0, h * 0.06, w * 0.14, 0, Math.PI * 2);
+                ctx.fillStyle = darkMetal;
                 ctx.fill();
-                ctx.strokeStyle = '#0ff';
+                ctx.strokeStyle = bossColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Inner ring
+                ctx.beginPath();
+                ctx.arc(0, h * 0.06, w * 0.09, 0, Math.PI * 2);
+                ctx.fillStyle = midMetal;
+                ctx.fill();
+                ctx.strokeStyle = bossColor;
                 ctx.lineWidth = 1;
                 ctx.stroke();
+
+                // Pulsing glowing core (reactor heart)
+                const pulse = 0.6 + Math.sin(performance.now() / 180) * 0.4;
+                ctx.save();
+                glowGlow(bossColor, 20 * pulse);
+                ctx.beginPath();
+                ctx.arc(0, h * 0.06, w * 0.05, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 0, 0, ${0.4 + pulse * 0.6})`;
+                ctx.fill();
+                ctx.restore();
+
+                // 7. Massive Mechanical Wings (drawn on top or slightly behind)
+                for (let side of [-1, 1]) {
+                    // Wing Hinge / Joint connecting wing to chassis
+                    poly([
+                        { x: side * w * 0.20, y: -h * 0.08 },
+                        { x: side * w * 0.28, y: -h * 0.18 },
+                        { x: side * w * 0.30, y: -h * 0.10 },
+                        { x: side * w * 0.22, y: -h * 0.02 }
+                    ], lightMetal, bossColor, 1.5);
+
+                    // Massive Sweeping Wing Polygon
+                    poly([
+                        { x: side * w * 0.26, y: -h * 0.14 },    // wing root front
+                        { x: side * w * 0.36, y: -h * 0.24 },    // elbow joint
+                        { x: side * w * 0.62, y: -h * 0.42 },    // mid wing leading edge
+                        { x: side * w * 0.95, y: -h * 0.54 },    // outer wing leading tip
+                        { x: side * w * 0.98, y: -h * 0.45 },    // wingtip point outer
+                        { x: side * w * 0.92, y: -h * 0.34 },    // wingtip inner return
+                        { x: side * w * 0.65, y: -h * 0.18 },    // mid trailing edge
+                        { x: side * w * 0.42, y: -h * 0.04 },    // inner trailing edge
+                        { x: side * w * 0.24, y: -h * 0.02 }     // wing root trailing
+                    ], darkMetal, bossColor, 2);
+
+                    // Upper wing panel overlay (adds depth like the sketch)
+                    poly([
+                        { x: side * w * 0.38, y: -h * 0.25 },
+                        { x: side * w * 0.62, y: -h * 0.41 },
+                        { x: side * w * 0.88, y: -h * 0.50 },
+                        { x: side * w * 0.85, y: -h * 0.40 },
+                        { x: side * w * 0.60, y: -h * 0.28 },
+                        { x: side * w * 0.38, y: -h * 0.18 }
+                    ], midMetal, bossColor, 1);
+
+                    // Glowing wing energy channels (mechanical highlights)
+                    ctx.save();
+                    glowGlow(bossColor, 8);
+                    line([
+                        { x: side * w * 0.40, y: -h * 0.22 },
+                        { x: side * w * 0.85, y: -h * 0.43 }
+                    ], bossColor, 2);
+                    ctx.restore();
+
+                    // Wing panel partition lines
+                    line([
+                        { x: side * w * 0.48, y: -h * 0.32 },
+                        { x: side * w * 0.52, y: -h * 0.18 }
+                    ], panelLineColor, 1.5);
+                    line([
+                        { x: side * w * 0.70, y: -h * 0.42 },
+                        { x: side * w * 0.72, y: -h * 0.26 }
+                    ], panelLineColor, 1.5);
+                }
             } else if (e.isShooter) {
                 // Twin-spire armored shooter (Based on User Design)
                 const w = e.width;
@@ -1318,73 +1684,165 @@ function draw() {
                 poly([[-w * 0.54, h * 0.08], [-w * 0.45, h * 0.02], [-w * 0.42, h * 0.12], [-w * 0.5, h * 0.18]], shade);
                 poly([[w * 0.54, h * 0.08], [w * 0.45, h * 0.02], [w * 0.42, h * 0.12], [w * 0.5, h * 0.18]], shade);
             } else {
-                // Standard Enemy (Bat-wing Stealth Drone - Based on User Design)
+                // Standard Enemy (Armored Drone - Based on User design)
                 const w = e.width;
                 const h = e.height;
 
                 ctx.rotate(Math.PI); // Rotate 180 degrees to face the player
 
-                // Main Wing Body (Dark Base)
-                ctx.fillStyle = '#111';
-                ctx.beginPath();
-                ctx.moveTo(0, -h * 0.5); // Nose
-                ctx.lineTo(w * 0.12, -h * 0.3); // Shoulder
-                ctx.lineTo(w * 0.5, h * 0.1);   // Wing Leading Tip
-                ctx.lineTo(w * 0.5, h * 0.35);  // Wing Trailing Tip
-                ctx.lineTo(w * 0.35, h * 0.25); // Trailing Notch 1
-                ctx.lineTo(w * 0.3, h * 0.5);   // Trailing Notch 2 (Engine pod)
-                ctx.lineTo(w * 0.1, h * 0.4);   // Trailing Notch 3
-                ctx.lineTo(0, h * 0.45);        // Rear Center
+                const hull = '#8c939d'; // Grey main body
+                const dark = '#20252e'; // Dark mechanics
+                const accent = e.color || '#ffea00'; // Yellow/gold color signature
+                const panel = 'rgba(255, 255, 255, 0.3)';
 
-                // Mirror Left
-                ctx.lineTo(-w * 0.1, h * 0.4);
-                ctx.lineTo(-w * 0.3, h * 0.5);
-                ctx.lineTo(-w * 0.35, h * 0.25);
-                ctx.lineTo(-w * 0.5, h * 0.35);
-                ctx.lineTo(-w * 0.5, h * 0.1);
-                ctx.lineTo(-w * 0.12, -h * 0.3);
-                ctx.closePath();
-                ctx.fill();
+                // Helper for local polys
+                const localPoly = (pts, color, strokeColor, strokeWidth = 1) => {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0][0], pts[0][1]);
+                    for (let i = 1; i < pts.length; i++) {
+                        ctx.lineTo(pts[i][0], pts[i][1]);
+                    }
+                    ctx.closePath();
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                    }
+                    if (strokeColor) {
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.stroke();
+                    }
+                };
 
-                // Neon Glow Edge
-                ctx.strokeStyle = e.color;
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
+                const localLine = (pts, strokeColor, strokeWidth = 1.2) => {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0][0], pts[0][1]);
+                    for (let i = 1; i < pts.length; i++) {
+                        ctx.lineTo(pts[i][0], pts[i][1]);
+                    }
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = strokeWidth;
+                    ctx.stroke();
+                };
 
-                // Central Ridge / Canopy
-                ctx.fillStyle = '#222';
-                ctx.beginPath();
-                ctx.moveTo(0, -h * 0.45);
-                ctx.lineTo(w * 0.12, 0);
-                ctx.lineTo(0, h * 0.2);
-                ctx.lineTo(-w * 0.12, 0);
-                ctx.closePath();
-                ctx.fill();
+                // 1. Central Engine Nozzles (between tail columns)
+                localPoly([[-w * 0.04, h * 0.15], [w * 0.04, h * 0.15], [w * 0.04, h * 0.32], [-w * 0.04, h * 0.32]], dark, accent, 1);
 
-                // Canopy highlight
-                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-                ctx.beginPath();
-                ctx.moveTo(0, -h * 0.4);
-                ctx.lineTo(0, h * 0.15);
-                ctx.stroke();
+                // 2. Parallel Tail Columns
+                // Left tail column
+                localPoly([
+                    [-w * 0.15, h * 0.1],
+                    [-w * 0.06, h * 0.1],
+                    [-w * 0.06, h * 0.65],
+                    [-w * 0.15, h * 0.65]
+                ], dark, accent, 1.2);
+                // Right tail column
+                localPoly([
+                    [w * 0.06, h * 0.1],
+                    [w * 0.15, h * 0.1],
+                    [w * 0.15, h * 0.65],
+                    [w * 0.06, h * 0.65]
+                ], dark, accent, 1.2);
 
-                // Panel Lines
-                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-                ctx.beginPath();
-                ctx.moveTo(w * 0.15, -h * 0.2);
-                ctx.lineTo(w * 0.1, -h * 0.15);
-                ctx.moveTo(-w * 0.15, -h * 0.2);
-                ctx.lineTo(-w * 0.1, -h * 0.15);
-                ctx.stroke();
+                // 3. Horizontal Stabilizer Feet (L-shapes at bottom of columns)
+                // Left stabilizer foot
+                localPoly([
+                    [-w * 0.15, h * 0.48],
+                    [-w * 0.06, h * 0.48],
+                    [-w * 0.06, h * 0.68],
+                    [-w * 0.32, h * 0.68],
+                    [-w * 0.32, h * 0.61],
+                    [-w * 0.15, h * 0.58]
+                ], accent, 'rgba(0,0,0,0.5)', 1);
+                // Right stabilizer foot
+                localPoly([
+                    [w * 0.06, h * 0.48],
+                    [w * 0.15, h * 0.48],
+                    [w * 0.15, h * 0.58],
+                    [w * 0.32, h * 0.61],
+                    [w * 0.32, h * 0.68],
+                    [w * 0.06, h * 0.68]
+                ], accent, 'rgba(0,0,0,0.5)', 1);
 
-                // Engine Glows
-                ctx.fillStyle = e.color;
-                ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 100) * 0.2;
-                ctx.beginPath();
-                ctx.arc(w * 0.125, h * 0.45, w * 0.05, 0, Math.PI * 2);
-                ctx.arc(-w * 0.125, h * 0.45, w * 0.05, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
+                // 4. Upper Winglets (Swept outward and slightly back)
+                // Left Winglet
+                localPoly([
+                    [-w * 0.12, -h * 0.25],
+                    [-w * 0.42, -h * 0.22],
+                    [-w * 0.36, -h * 0.10],
+                    [-w * 0.15, -h * 0.08]
+                ], accent, 'rgba(0,0,0,0.4)', 1);
+                // Right Winglet
+                localPoly([
+                    [w * 0.12, -h * 0.25],
+                    [w * 0.42, -h * 0.22],
+                    [w * 0.36, -h * 0.10],
+                    [w * 0.15, -h * 0.08]
+                ], accent, 'rgba(0,0,0,0.4)', 1);
+
+                // 5. Main Wing Panels
+                // Left Main Wing
+                localPoly([
+                    [-w * 0.15, -h * 0.08],
+                    [-w * 0.72, h * 0.08],
+                    [-w * 0.68, h * 0.18],
+                    [-w * 0.15, h * 0.15]
+                ], hull, accent, 1.5);
+                // Right Main Wing
+                localPoly([
+                    [w * 0.15, -h * 0.08],
+                    [w * 0.72, h * 0.08],
+                    [w * 0.68, h * 0.18],
+                    [w * 0.15, h * 0.15]
+                ], hull, accent, 1.5);
+                // Wing accents (Gold/tan trailing edge armor plates)
+                // Left wing trailing edge accent
+                localPoly([
+                    [-w * 0.5, h * 0.12],
+                    [-w * 0.72, h * 0.08],
+                    [-w * 0.68, h * 0.18],
+                    [-w * 0.45, h * 0.16]
+                ], accent, 'rgba(0,0,0,0.3)', 1);
+                // Right wing trailing edge accent
+                localPoly([
+                    [w * 0.5, h * 0.12],
+                    [w * 0.72, h * 0.08],
+                    [w * 0.68, h * 0.18],
+                    [w * 0.45, h * 0.16]
+                ], accent, 'rgba(0,0,0,0.3)', 1);
+
+                // 6. Central Fuselage and Canopy
+                // Main fuselage plate
+                localPoly([
+                    [0, -h * 0.42],       // Nose tip
+                    [w * 0.12, -h * 0.25], // Shoulder
+                    [w * 0.15, h * 0.05],  // Waist
+                    [w * 0.12, h * 0.22],  // Lower waist
+                    [0, h * 0.26],         // Rear center
+                    [-w * 0.12, h * 0.22],
+                    [-w * 0.15, h * 0.05],
+                    [-w * 0.12, -h * 0.25]
+                ], hull, accent, 1.8);
+                // Gold chest/vent panel near mid-front
+                localPoly([
+                    [-w * 0.08, h * 0.08],
+                    [w * 0.08, h * 0.08],
+                    [w * 0.06, h * 0.18],
+                    [-w * 0.06, h * 0.18]
+                ], accent, 'rgba(0,0,0,0.5)', 1);
+                // Cockpit window / canopy
+                localPoly([
+                    [0, -h * 0.22],
+                    [w * 0.06, -h * 0.1],
+                    [w * 0.05, h * 0.02],
+                    [-w * 0.05, h * 0.02],
+                    [-w * 0.06, -h * 0.1]
+                ], dark, accent, 1);
+
+                // 7. Panel Lines
+                localLine([[0, -h * 0.4], [0, -h * 0.22]], panel, 1);
+                localLine([[-w * 0.05, h * 0.05], [-w * 0.05, h * 0.18]], panel, 0.8);
+                localLine([[w * 0.05, h * 0.05], [w * 0.05, h * 0.18]], panel, 0.8);
             }
 
             // Health bar for boss or sturdy enemies
@@ -1404,12 +1862,21 @@ function draw() {
     if (isPlaying || isGameOver) {
         enemies.forEach(e => {
             if (e.bullets && e.bullets.length > 0) {
-                ctx.fillStyle = '#ff8800'; // Orange bullets
+                ctx.save();
                 ctx.shadowBlur = 5;
-                ctx.shadowColor = '#ff8800';
                 e.bullets.forEach(b => {
-                    ctx.fillRect(b.x - b.width / 2, b.y - b.height / 2, b.width, b.height);
+                    ctx.fillStyle = b.color || '#ff8800';
+                    ctx.shadowColor = b.color || '#ff8800';
+                    ctx.save();
+                    ctx.translate(b.x, b.y);
+                    if (b.vx !== undefined && b.vx !== 0) {
+                        const angle = Math.atan2(b.vy || b.speed, b.vx) - Math.PI / 2;
+                        ctx.rotate(angle);
+                    }
+                    ctx.fillRect(-b.width / 2, -b.height / 2, b.width, b.height);
+                    ctx.restore();
                 });
+                ctx.restore();
             }
         });
     }
@@ -1423,13 +1890,6 @@ function gameLoop(timestamp) {
         update(deltaTime);
         updateHUD();
         draw(); // draw always
-
-        if (isPaused) {
-            // If paused, we basically just keep looping but don't update logic in the next frame? 
-            // Actually, `update()` already checks `!isPlaying` but NOT `isPaused`.
-            // Let's modify safe guard in update() or just handle it here?
-            // Easiest is to prevent update() call if paused.
-        }
 
         // Always continue the loop
         gameLoopId = requestAnimationFrame(gameLoop);
@@ -1482,16 +1942,8 @@ function spawnEnemy() {
             easing: 'easeInOutSine'
         });
 
-        // Rocking/Wobble Effect
+        // Rocking/Wobble Effect (removed)
         enemy.rotation = 0; // Initialize rotation
-        anime({
-            targets: enemy,
-            rotation: [-0.2, 0.2], // Rotate slightly left and right
-            duration: 1000,
-            direction: 'alternate',
-            loop: true,
-            easing: 'easeInOutQuad'
-        });
     }
 }
 
@@ -1511,7 +1963,7 @@ function spawnBoss() {
         health: 100, // 100 hits
         maxHealth: 100,
         lastShot: performance.now(),
-        shootDelay: 6000, // 6 seconds
+        shootDelay: 3000, // 3 seconds (5 spreading shots)
         bullets: [],
         shotsFired: 0,
         state: 'entering' // entering, fighting
@@ -1722,13 +2174,14 @@ function drawPlayerShape(ctx, shape, primary) {
 
     // Multiplier to normalize all shapes to a consistent size
     let sc = 1.0;
-    if (shape === 'classic') sc = 0.32; // Normalized scale for the detailed blueprint fighter
-    else if (shape === 'fighter') sc = 0.42; // Normalized scale for the extra-long fuselage
-    else if (shape === 'interceptor') sc = 0.42; // Normalized scale for the extra-long twin blades
-    else if (shape === 'bomber') sc = 0.4;
-    else if (shape === 'speeder') sc = 0.55;
-    else if (shape === 'stealth') sc = 0.6;
-    else if (shape === 'titan') sc = 0.46;
+    if (shape === 'classic') sc = 0.35; // Normalized scale for the detailed blueprint fighter
+    else if (shape === 'fighter') sc = 0.48; // Scaled up size
+    else if (shape === 'interceptor') sc = 0.38; // Scaled up size
+    else if (shape === 'bomber') sc = 0.34;
+    else if (shape === 'speeder') sc = 0.45;
+    else if (shape === 'stealth') sc = 0.43;
+    else if (shape === 'titan') sc = 0.52; // Heavy class size boost
+    else if (shape === 'vintage') sc = 0.38;
 
     ctx.save();
     ctx.scale(sc, sc);
@@ -1773,288 +2226,284 @@ function drawPlayerShape(ctx, shape, primary) {
     }
 
     if (shape === 'classic') {
-        // --- CLASSIC: blueprint strike fighter ---
-        const hull = p;
-        const shade = p;
-        const glass = '#07090d';
-        const dark = '#171d24';
-        const panel = '#89939c';
+        // --- CLASSIC: Angular Flying Wing Stealth Bomber (Reference Image Match) ---
+        const hull = p; // Chosen color is the major body color
+        const dark = '#1a1f28'; // Deep dark panels
+        const accent = p; // Player's chosen color for accent highlights
+        const panel = 'rgba(255, 255, 255, 0.25)';
+        const glass = '#0a0e14';
 
         ctx.save();
         ctx.shadowBlur = 8 / sc;
         ctx.shadowColor = p;
 
-        // Long pointed nose and main fuselage.
-        poly([[0, -86], [10, -58], [14, -18], [12, 46], [6, 82], [0, 94], [-6, 82], [-12, 46], [-14, -18], [-10, -58]], hull);
-        poly([[0, -76], [7, -50], [8, -24], [4, -8], [0, -2], [-4, -8], [-8, -24], [-7, -50]], glass, 0.96);
-        poly([[-8, -1], [0, -10], [8, -1], [6, 16], [0, 22], [-6, 16]], dark, 0.75);
-        line([[0, -84], [0, 90]], panel, 0.9);
-
-        // Forward shoulder wings.
-        poly([[-12, -28], [-48, 12], [-42, 36], [-12, 22]], hull);
-        poly([[12, -28], [48, 12], [42, 36], [12, 22]], hull);
-        line([[-17, -17], [-43, 31]], panel, 1);
-        line([[17, -17], [43, 31]], panel, 1);
-        poly([[-37, 14], [-45, 31], [-30, 25]], dark, 0.55);
-        poly([[37, 14], [45, 31], [30, 25]], dark, 0.55);
-
-        // Large rear swept wings from the reference.
-        poly([[-13, 36], [-72, 70], [-106, 124], [-94, 138], [-37, 106], [-19, 80]], hull);
-        poly([[13, 36], [72, 70], [106, 124], [94, 138], [37, 106], [19, 80]], hull);
-        poly([[-72, 70], [-104, 124], [-94, 132], [-61, 86]], shade, 0.55);
-        poly([[72, 70], [104, 124], [94, 132], [61, 86]], shade, 0.55);
-        line([[-26, 64], [-93, 130]], panel, 1.1);
-        line([[26, 64], [93, 130]], panel, 1.1);
-        line([[-62, 96], [-97, 131]], dark, 1.8);
-        line([[62, 96], [97, 131]], dark, 1.8);
-
-        // Twin engine blocks and lower center spine.
-        poly([[-31, 50], [-12, 52], [-11, 110], [-30, 116], [-38, 86]], dark, 0.9);
-        poly([[31, 50], [12, 52], [11, 110], [30, 116], [38, 86]], dark, 0.9);
-        poly([[-27, 60], [-15, 61], [-15, 92], [-28, 96]], hull, 0.55);
-        poly([[27, 60], [15, 61], [15, 92], [28, 96]], hull, 0.55);
-        poly([[-8, 42], [0, 34], [8, 42], [8, 122], [0, 144], [-8, 122]], dark, 0.88);
-        poly([[-4, 98], [0, 142], [4, 98], [0, 116]], glass, 0.96);
-
-        // Rear fins and exhaust teeth.
-        poly([[-36, 98], [-24, 116], [-26, 136], [-39, 128]], hull);
-        poly([[36, 98], [24, 116], [26, 136], [39, 128]], hull);
-        line([[-31, 113], [-30, 134]], panel, 1);
-        line([[31, 113], [30, 134]], panel, 1);
-        for (let i = 0; i < 4; i++) {
-            line([[-28 + i * 5, 116], [-30 + i * 5, 127]], p, 1.1);
-            line([[28 - i * 5, 116], [30 - i * 5, 127]], p, 1.1);
-        }
-
-        // Blueprint panel details.
-        line([[-9, 23], [-24, 76], [-20, 111]], panel, 1);
-        line([[9, 23], [24, 76], [20, 111]], panel, 1);
-        line([[-50, 82], [-88, 122]], panel, 0.8);
-        line([[50, 82], [88, 122]], panel, 0.8);
-        circ(-8, 28, 2.2, dark, 0.8);
-        circ(8, 28, 2.2, dark, 0.8);
-        circ(-21, 70, 2.4, p, 0.8);
-        circ(21, 70, 2.4, p, 0.8);
-        circ(0, 144, 4.5, p, 0.82);
-        circ(-21, 132, 4, p, 0.55);
-        circ(21, 132, 4, p, 0.55);
-        ctx.restore();
-
-
-    } else if (shape === 'fighter') {
-        // --- FIGHTER: Advanced Multi-Role Tactical Jet (Reference Image Match) ---
-
-        // 1. Main Wings (Primary Outline & Fill)
-        // Left Wing
+        // 1. Main Flying Wing Body (trailing edge slants sharply inward)
         poly([
-            [-10, -10],     // Wing root front
-            [-50, 15],      // Mid-swept leading edge
-            [-42, 22],      // Inner wing indent
-            [-66, 22],      // Outer wing forward join
-            [-66, 42],      // Outboard pod join
-            [-12, 45]       // Wing root trailing edge
-        ], p);
-        // Right Wing
-        poly([
-            [10, -10],
-            [50, 15],
-            [42, 22],
-            [66, 22],
-            [66, 42],
-            [12, 45]
-        ], p);
+            [0, -70],       // Nose tip
+            [12, -45],      // Nose taper
+            [30, -20],      // Forward body shoulder
+            [90, 30],       // Wingtip leading
+            [85, 38],       // Wingtip trailing outer
+            [45, 42],       // Trailing edge slants inward sharply
+            [18, 48],       // Inner trailing (narrow)
+            [8, 55],        // Rear body narrows
+            [0, 58],        // Center trailing point
+            [-8, 55],
+            [-18, 48],
+            [-45, 42],
+            [-85, 38],
+            [-90, 30],
+            [-30, -20],
+            [-12, -45]
+        ], hull);
 
-        // Outer Wing Panel & Winglets (Extending from Outboard Pods)
-        // Left outer wing
+        // 2. Dark Central Spine (raised body section)
         poly([
-            [-74, 20],      // Outer pod attachment
-            [-94, 30],      // Wingtip leading tip
-            [-94, 40],      // Wingtip trailing tip
-            [-74, 42]       // Outer pod rear attachment
-        ], p);
-        // Right outer wing
-        poly([
-            [74, 20],
-            [94, 30],
-            [94, 40],
-            [74, 42]
-        ], p);
-        // Winglets (Vertical tips)
-        line([[-94, 25], [-94, 45]], s, 2);
-        line([[94, 25], [94, 45]], s, 2);
+            [0, -68],
+            [10, -40],
+            [14, -10],
+            [16, 20],
+            [10, 45],
+            [5, 55],
+            [0, 58],
+            [-5, 55],
+            [-10, 45],
+            [-16, 20],
+            [-14, -10],
+            [-10, -40]
+        ], dark);
 
-        // 2. Canards (Forward swept stabilization fins)
-        poly([[-8, -35], [-24, -45], [-24, -35], [-10, -25]], p);
-        poly([[8, -35], [24, -45], [24, -35], [10, -25]], p);
+        // 3. Wing Surface Detail - Dark panel sections
+        // Left wing inner dark panel
+        poly([[-18, -5], [-50, 18], [-45, 35], [-18, 25]], dark, 0.6);
+        // Left wing outer dark panel
+        poly([[-50, 20], [-82, 32], [-75, 42], [-48, 35]], dark, 0.55);
+        // Right wing inner dark panel
+        poly([[18, -5], [50, 18], [45, 35], [18, 25]], dark, 0.6);
+        // Right wing outer dark panel
+        poly([[50, 20], [82, 32], [75, 42], [48, 35]], dark, 0.55);
 
-        // 3. Outboard Engine / Missile Pods
-        // Left Outboard Pod
-        poly([
-            [-70, 0],       // Nose tip
-            [-66, 12],      // Body transition
-            [-66, 45],      // Engine mount
-            [-74, 45],      // Engine mount outer
-            [-74, 12]       // Body transition outer
-        ], '#111');
-        poly([[-68, 5], [-72, 5], [-72, 40], [-68, 40]], p, 0.4); // Neon glow panel on pod
-        // Left pod nose cone & nozzle
-        poly([[-70, -8], [-66, 0], [-74, 0]], s); // Nose
-        poly([[-68, 45], [-72, 45], [-73, 52], [-67, 52]], '#333'); // Nozzle
-        
-        // Right Outboard Pod
-        poly([
-            [70, 0],
-            [66, 12],
-            [66, 45],
-            [74, 45],
-            [74, 12]
-        ], '#111');
-        poly([[68, 5], [72, 5], [72, 40], [68, 40]], p, 0.4);
-        poly([[70, -8], [66, 0], [74, 0]], s);
-        poly([[68, 45], [72, 45], [73, 52], [67, 52]], '#333');
+        // 4. Twin Angled Vertical Tail Fins (flanking the tail)
+        // Left fin
+        poly([[-8, 38], [-14, 30], [-20, 28], [-22, 52], [-16, 55], [-10, 48]], dark);
+        line([[-15, 32], [-20, 50]], panel, 0.8);
+        line([[-20, 28], [-22, 52]], accent, 1);
+        // Right fin
+        poly([[8, 38], [14, 30], [20, 28], [22, 52], [16, 55], [10, 48]], dark);
+        line([[15, 32], [20, 50]], panel, 0.8);
+        line([[20, 28], [22, 52]], accent, 1);
 
-        // 4. Underwing Weapon/Fuel Tanks (White/Grey with details)
-        // Left Tank
-        poly([
-            [-24, 0],       // Tank front point
-            [-21, 10],      // Body
-            [-21, 55],
-            [-24, 60],      // Tank rear point
-            [-27, 55],
-            [-27, 10]
-        ], '#222');
-        poly([
-            [-24, 5],
-            [-22, 12],
-            [-22, 50],
-            [-24, 55],
-            [-26, 50],
-            [-26, 12]
-        ], '#fff', 0.85);
-        // Tank tail fins
-        line([[-24, 55], [-29, 62]], '#aaa', 1.5);
-        line([[-24, 55], [-19, 62]], '#aaa', 1.5);
+        // 5. Extended Tail Section with Vertical Fin
+        // Tail boom extending backward from narrow rear
+        poly([[-5, 52], [5, 52], [4, 82], [-4, 82]], dark);
+        // Tail hull accent
+        poly([[-3, 55], [3, 55], [2, 78], [-2, 78]], hull, 0.7);
+        // Vertical tail fin (tall, prominent)
+        poly([[-2, 62], [2, 62], [2, 90], [0, 95], [-2, 90]], dark);
+        line([[0, 62], [0, 93]], accent, 1.2);
+        // Dark horizontal stabilizer at tail (replacing gold)
+        poly([[-16, 78], [16, 78], [14, 82], [-14, 82]], dark);
+        circ(-15, 80, 1.5, dark, 0.8);
+        circ(15, 80, 1.5, dark, 0.8);
+        circ(0, 95, 1.8, accent, 0.8);
+        // Exhaust glow at tail tip (removed)
+        // circ(0, 83, 1.8, accent, 0.85);
+        // circ(0, 83, 0.8, '#fff', 0.5);
 
-        // Right Tank
-        poly([
-            [24, 0],
-            [21, 10],
-            [21, 55],
-            [24, 60],
-            [27, 55],
-            [27, 10]
-        ], '#222');
-        poly([
-            [24, 5],
-            [22, 12],
-            [22, 50],
-            [24, 55],
-            [26, 50],
-            [26, 12]
-        ], '#fff', 0.85);
-        // Tank tail fins
-        line([[24, 55], [29, 62]], '#aaa', 1.5);
-        line([[24, 55], [19, 62]], '#aaa', 1.5);
+        // 6. Dark Trailing Edge Accent Strips (following inward slant, replacing gold)
+        line([[-85, 36], [-45, 42], [-18, 48]], dark, 1.5);
+        line([[85, 36], [45, 42], [18, 48]], dark, 1.5);
 
-        // 5. Main Fuselage Structure (Overlay on top of wing centers)
-        poly([
-            [0, -105],      // Nose tip
-            [5, -75],       // Nose taper 1
-            [8, -50],       // Nose taper 2 (Canard base)
-            [12, -20],      // Cockpit area widest
-            [10, 15],       // Mid waist indentation
-            [14, 45],       // Rear engine deck
-            [0, 50],        // Rear center tail joint
-            [-14, 45],
-            [-10, 15],
-            [-12, -20],
-            [-8, -50],
-            [-5, -75]
-        ], p);
-
-        // Dark composite centerline plate
-        poly([[0, -85], [5, -45], [7, 30], [0, 42], [-7, 30], [-5, -45]], '#111', 0.9);
-
-        // 6. Canopy (Shaded cockpit dome to match silver gradient look)
-        // Canopy casing
-        poly([[0, -52], [6, -40], [6, -20], [0, -12], [-6, -20], [-6, -40]], '#222');
-        
-        // Metallic glass gradient canopy
-        let canopyGrad = ctx.createLinearGradient(-5, -45, 5, -15);
-        canopyGrad.addColorStop(0, '#333');
-        canopyGrad.addColorStop(0.25, '#888');
-        canopyGrad.addColorStop(0.5, '#eee');
-        canopyGrad.addColorStop(0.75, '#bbb');
-        canopyGrad.addColorStop(1, '#222');
-        
+        // 7. Cockpit Window (small, near nose)
+        poly([[0, -35], [4, -30], [4, -20], [0, -16], [-4, -20], [-4, -30]], glass);
+        let canopyGrad = ctx.createLinearGradient(-3, -34, 3, -18);
+        canopyGrad.addColorStop(0, '#101820');
+        canopyGrad.addColorStop(0.4, '#3a4858');
+        canopyGrad.addColorStop(0.6, '#687880');
+        canopyGrad.addColorStop(1, '#080c10');
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(0, -48);
-        ctx.bezierCurveTo(4.5, -44, 4.5, -20, 0, -15);
-        ctx.bezierCurveTo(-4.5, -20, -4.5, -44, 0, -48);
+        ctx.moveTo(0, -33);
+        ctx.bezierCurveTo(3, -30, 3, -20, 0, -18);
+        ctx.bezierCurveTo(-3, -20, -3, -30, 0, -33);
         ctx.closePath();
         ctx.fillStyle = canopyGrad;
         ctx.fill();
         ctx.restore();
+        line([[0, -33], [0, -18]], 'rgba(255,255,255,0.15)', 0.5);
 
-        // Canopy frame details
-        line([[0, -48], [0, -15]], 'rgba(0, 0, 0, 0.4)', 1);
-        line([[-4, -30], [4, -30]], 'rgba(0, 0, 0, 0.3)', 1);
+        // 8. Panel Lines & Surface Detail
+        line([[-12, -40], [-88, 32]], panel, 1);
+        line([[12, -40], [88, 32]], panel, 1);
+        line([[-20, 5], [-78, 36]], panel, 0.8);
+        line([[20, 5], [78, 36]], panel, 0.8);
+        line([[-16, 30], [-65, 46]], panel, 0.7);
+        line([[16, 30], [65, 46]], panel, 0.7);
+        line([[-45, 10], [-45, 42]], panel, 0.6);
+        line([[45, 10], [45, 42]], panel, 0.6);
+        line([[-68, 24], [-68, 44]], panel, 0.6);
+        line([[68, 24], [68, 44]], panel, 0.6);
+        line([[0, -65], [0, -38]], panel, 0.7);
+        line([[0, -14], [0, 55]], panel, 0.6);
+        line([[-10, -35], [-14, 10], [-10, 48]], panel, 0.7);
+        line([[10, -35], [14, 10], [10, 48]], panel, 0.7);
 
-        // 7. Twin Rear Stabilizers (Tailplanes)
-        poly([[-10, 42], [-32, 75], [-20, 80], [-6, 48]], p);
-        poly([[10, 42], [32, 75], [20, 80], [6, 48]], p);
+        // 9. Accent Color Highlights
+        circ(0, -68, 2, accent, 0.7);
+        circ(0, -68, 1, '#fff', 0.4);
+        circ(-60, 35, 1.5, accent, 0.5);
+        circ(60, 35, 1.5, accent, 0.5);
 
-        // 8. Dual Engine Nozzles (Nozzle casing & Exhaust flaps)
-        poly([[-10, 45], [-2, 45], [-1, 58], [-11, 58]], '#333');
-        poly([[10, 45], [2, 45], [1, 58], [11, 58]], '#333');
-        // Nozzle serrations / detail lines
-        line([[-6, 45], [-6, 58]], '#111', 1);
-        line([[6, 45], [6, 58]], '#111', 1);
+        ctx.restore();
 
-        // Engine propulsion glow (Behind nozzle)
-        circ(-6, 58, 5, s, 0.85);
-        circ(6, 58, 5, s, 0.85);
-        circ(-6, 58, 2, '#fff', 0.6);
-        circ(6, 58, 2, '#fff', 0.6);
 
-        // 9. Technical Panel Lines / Mechanical Etchings
-        // Wing panel lines
-        line([[-18, 15], [-45, 20]], 'rgba(255, 255, 255, 0.25)', 0.8);
-        line([[18, 15], [45, 20]], 'rgba(255, 255, 255, 0.25)', 0.8);
-        line([[-25, 28], [-42, 38]], 'rgba(255, 255, 255, 0.25)', 0.8);
-        line([[25, 28], [42, 38]], 'rgba(255, 255, 255, 0.25)', 0.8);
+    } else if (shape === 'fighter') {
+        // --- FIGHTER: Tactical Arrowhead Interceptor (Reference Sketch Match) ---
+        const hull = p; // Major color is chosen signature color p
+        const dark = '#1a1f26'; // Dark engine/fuselage panels
+        const panel = 'rgba(255, 255, 255, 0.45)'; // White panel outlines since body is colored
+        const lightPanel = 'rgba(0, 0, 0, 0.3)'; // Dark panel highlight lines
 
-        // Fuselage spine
-        line([[0, -80], [0, -52]], 'rgba(255, 255, 255, 0.3)', 0.8);
-        line([[0, -12], [0, 35]], 'rgba(255, 255, 255, 0.3)', 0.8);
-        
-        // Circular center cap details
-        circ(0, 10, 3, s, 0.4);
+        ctx.save();
+        ctx.shadowBlur = 8 / sc;
+        ctx.shadowColor = p;
+
+        // 1. Long Pointed Fuselage / Nose Spine
+        // Base dark metal underlayer
+        poly([[0, -90], [8, -60], [12, -20], [13, 10], [0, 45], [-13, 10], [-12, -20], [-8, -60]], dark);
+        // Dark contrast spine decal
+        poly([[0, -90], [4, -60], [5, -20], [5, 10], [0, 30], [-5, 10], [-5, -20], [-4, -60]], dark);
+        // Central body light grey cover plates (now hull = p)
+        poly([[0, -80], [3, -55], [3, -15], [0, 5], [-3, -15], [-3, -55]], hull);
+
+        // 2. Cockpit Canopy (Central long capsule)
+        poly([[0, -50], [5, -35], [5, -15], [0, -5], [-5, -15], [-5, -35]], '#090d14');
+        let canopyGrad = ctx.createLinearGradient(-4, -45, 4, -10);
+        canopyGrad.addColorStop(0, '#1a3040');
+        canopyGrad.addColorStop(0.3, '#5c7890');
+        canopyGrad.addColorStop(0.6, '#ffffff');
+        canopyGrad.addColorStop(1, '#0c1117');
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, -48);
+        ctx.bezierCurveTo(4, -45, 4, -12, 0, -8);
+        ctx.bezierCurveTo(-4, -12, -4, -45, 0, -48);
+        ctx.closePath();
+        ctx.fillStyle = canopyGrad;
+        ctx.fill();
+        ctx.restore();
+        // Canopy center panel line
+        line([[0, -48], [0, -8]], 'rgba(255, 255, 255, 0.3)', 0.8);
+
+        // 3. Bulky Engine/Shoulder Blocks (Flanking the cockpit)
+        for (let side of [-1, 1]) {
+            const sx = side * 18;
+            // Base shoulder structure
+            poly([[side * 6, -18], [sx - side * 4, -18], [sx - side * 10, 5], [sx - side * 6, 25], [side * 10, 25], [side * 6, 5]], dark);
+            // Dark contrast accent panel
+            poly([[side * 8, -14], [sx - side * 5, -14], [sx - side * 8, 5], [sx - side * 5, 20], [side * 9, 20]], dark);
+            // Major color top plate (hull = p)
+            poly([[side * 8, -5], [sx - side * 5, 0], [sx - side * 6, 12], [side * 9, 12]], hull);
+            // Mechanical detail lines on shoulders
+            line([[sx - side * 4, -18], [sx - side * 8, 15]], panel, 0.9);
+        }
+
+        // 4. Curved Swept Main Wings
+        // Left Wing
+        poly([
+            [-24, -10],      // Wing root front
+            [-55, 2],       // Wing mid-span leading edge
+            [-85, 10],      // Wingtip leading point
+            [-87, 12],      // Wingtip sharp trailing edge
+            [-65, 18],      // Wing mid-span trailing edge
+            [-28, 25]       // Wing root rear
+        ], hull);
+        // Left Wing dark contrast accent decal
+        poly([
+            [-24, -10],
+            [-55, 2],
+            [-85, 10],
+            [-65, 12],
+            [-26, 5]
+        ], dark);
+        // Left Wing panel cuts
+        line([[-24, -2], [-83, 10]], panel, 1);
+        line([[-55, 2], [-65, 18]], panel, 0.9);
+
+        // Right Wing
+        poly([
+            [24, -10],
+            [55, 2],
+            [85, 10],
+            [87, 12],
+            [65, 18],
+            [28, 25]
+        ], hull);
+        // Right Wing dark contrast accent decal
+        poly([
+            [24, -10],
+            [55, 2],
+            [85, 10],
+            [65, 12],
+            [26, 5]
+        ], dark);
+        // Right Wing panel cuts
+        line([[24, -2], [83, 10]], panel, 1);
+        line([[55, 2], [65, 18]], panel, 0.9);
+
+        // 5. Tail Stabilizers (Swept-back stabilizers pointing outwards)
+        poly([[-12, 25], [-45, 58], [-35, 65], [-8, 38]], hull);
+        poly([[-35, 50], [-45, 58], [-35, 65], [-27, 57]], dark); // Accent tip
+        poly([[12, 25], [45, 58], [35, 65], [8, 38]], hull);
+        poly([[35, 50], [45, 58], [35, 65], [27, 57]], dark); // Accent tip
+
+        // 6. Central Engine Exhausts, Nozzles & Rear Spikes
+        // Left Nozzle casing
+        poly([[-8, 32], [-2, 32], [-1, 55], [-7, 55]], dark);
+        // Right Nozzle casing
+        poly([[8, 32], [2, 32], [1, 55], [7, 55]], dark);
+        // Twin center tail spikes (flaps pointing back)
+        poly([[-4, 52], [0, 72], [4, 52]], dark);
+        line([[0, 52], [0, 70]], p, 1);
+        // Propulsion glow (removed)
+        // circ(-5, 55, 4.5, s, 0.85);
+        // circ(5, 55, 4.5, s, 0.85);
+        // circ(-5, 55, 2, '#fff', 0.6);
+        // circ(5, 55, 2, '#fff', 0.6);
+
+        // 7. General Panel Lines & Detailing
+        line([[0, -80], [0, -52]], panel, 0.8);
+        line([[0, -5], [0, 30]], panel, 0.8);
+        circ(0, 20, 2.5, s, 0.45);
+
+        ctx.restore();
 
 
     } else if (shape === 'interceptor') {
         // --- INTERCEPTOR: Twin-Blade Heavy Striker (Reference Image Match) ---
+        const hull = p; // Major color is chosen signature color p
+        const dark = '#111318'; // Dark mechanical contrast
+        const metal = '#1c222d'; // Metal accents
+        const panel = 'rgba(255, 255, 255, 0.45)'; // White highlighting line since body is colored
 
         // 1. Structural Truss Struts (Connecting cockpit center, wing roots, and pincers)
         ctx.save();
-        ctx.strokeStyle = '#222';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.lineWidth = 2.5 / sc;
-        // Pincer connections
-        line([[-6, -15], [-12, -45]], '#222');
-        line([[6, -15], [12, -45]], '#222');
-        line([[-12, 10], [-30, 5]], '#222');
-        line([[12, 10], [30, 5]], '#222');
-        line([[-10, 25], [-22, 10]], '#222');
-        line([[10, 25], [22, 10]], '#222');
+        // Pincer connections (Now visible light metallic grey/white)
+        line([[-6, -15], [-12, -45]], 'rgba(255, 255, 255, 0.45)');
+        line([[6, -15], [12, -45]], 'rgba(255, 255, 255, 0.45)');
+        line([[-12, 10], [-30, 5]], 'rgba(255, 255, 255, 0.45)');
+        line([[12, 10], [30, 5]], 'rgba(255, 255, 255, 0.45)');
+        line([[-10, 25], [-22, 10]], 'rgba(255, 255, 255, 0.45)');
+        line([[10, 25], [22, 10]], 'rgba(255, 255, 255, 0.45)');
         // Outer mechanical trusses
-        line([[-25, 0], [-25, 35]], '#111', 1.5);
-        line([[25, 0], [25, 35]], '#111', 1.5);
+        line([[-25, 0], [-25, 35]], 'rgba(255, 255, 255, 0.3)', 1.5);
+        line([[25, 0], [25, 35]], 'rgba(255, 255, 255, 0.3)', 1.5);
         ctx.restore();
 
         // 2. Giant Forward Pincer Blades (Left & Right)
-        // Left Pincer Blade - Outer primary color signature, inner mechanical dark plating
-        // Left Pincer (Dark structural base)
+        // Left Pincer (Primary body = hull)
         poly([
             [-32, 12],      // base outer
             [-14, 12],      // base inner
@@ -2064,7 +2513,7 @@ function drawPlayerShape(ctx, shape, primary) {
             [-19, -40],     // mid taper outer
             [-29, -15],     // base taper outer
             [-35, 0]        // base outer corner
-        ], '#1d222e');
+        ], hull);
 
         // Left Pincer (Serrated Inner Edge)
         poly([
@@ -2083,9 +2532,9 @@ function drawPlayerShape(ctx, shape, primary) {
             [-14, -62],     // notch 6
             [-13, -30],     // base taper
             [-10, -35]      // inner base
-        ], '#111');
+        ], dark);
 
-        // Left Pincer (Color Signature Accent Panel - Outer Blade section)
+        // Left Pincer (Color Signature Accent Panel - Outer Blade section -> changed to dark contrast)
         poly([
             [-19, -40],     // mid outer
             [-7, -120],     // tip
@@ -2093,10 +2542,13 @@ function drawPlayerShape(ctx, shape, primary) {
             [-15, -60],
             [-22, -35],
             [-26, -20]
-        ], p);
+        ], dark);
+
+        // Left Pincer White Accent Stripe (Diagonal boundary divider)
+        line([[-26, -20], [-22, -35], [-15, -60], [-12, -80], [-7, -120]], 'rgba(255, 255, 255, 0.75)', 1.2);
 
         // Right Pincer Blade (Mirror)
-        // Right Pincer (Dark structural base)
+        // Right Pincer (Primary body = hull)
         poly([
             [32, 12],
             [14, 12],
@@ -2106,7 +2558,7 @@ function drawPlayerShape(ctx, shape, primary) {
             [19, -40],
             [29, -15],
             [35, 0]
-        ], '#1d222e');
+        ], hull);
 
         // Right Pincer (Serrated Inner Edge)
         poly([
@@ -2124,9 +2576,9 @@ function drawPlayerShape(ctx, shape, primary) {
             [12, -62],
             [13, -30],
             [10, -35]
-        ], '#111');
+        ], dark);
 
-        // Right Pincer (Color Signature Accent Panel - Outer Blade section)
+        // Right Pincer (Color Signature Accent Panel - Outer Blade section -> changed to dark contrast)
         poly([
             [19, -40],
             [7, -120],
@@ -2134,7 +2586,10 @@ function drawPlayerShape(ctx, shape, primary) {
             [15, -60],
             [22, -35],
             [26, -20]
-        ], p);
+        ], dark);
+
+        // Right Pincer White Accent Stripe (Diagonal boundary divider)
+        line([[26, -20], [22, -35], [15, -60], [12, -80], [7, -120]], 'rgba(255, 255, 255, 0.75)', 1.2);
 
         // 3. Central Spine / Fuselage Core
         poly([
@@ -2146,10 +2601,12 @@ function drawPlayerShape(ctx, shape, primary) {
             [-11, 28],
             [-9, -15],
             [-5, -25]
-        ], '#1d222e');
+        ], hull);
 
-        // Center spine accent
-        line([[0, -55], [0, -15]], s, 1.2);
+        // Center spine accent & details
+        line([[0, -55], [0, -15]], 'rgba(255, 255, 255, 0.7)', 1.2);
+        line([[-6, -15], [-7, 10], [-5, 28]], 'rgba(255, 255, 255, 0.35)', 1);
+        line([[6, -15], [7, 10], [5, 28]], 'rgba(255, 255, 255, 0.35)', 1);
         circ(0, -42, 2.5, '#ff8800', 0.95); // Glowing amber forward sensor node
 
         // 4. Dual Canopy Reactors / Glowing Cockpit Pods (Shaded Gold Canopy)
@@ -2183,31 +2640,33 @@ function drawPlayerShape(ctx, shape, primary) {
         line([[-4, 25], [4, 25]], 'rgba(0, 0, 0, 0.3)', 0.8);
 
         // 5. Mid Wings (Horizontal tabs with triple fire support barrels)
-        // Left Mid-Wing
+        // Left Mid-Wing (Contrast dark)
         poly([
             [-11, 0],       // body attachment front
             [-46, 0],       // outer wing front
             [-46, 14],      // outer wing rear
             [-11, 14]       // body attachment rear
-        ], p);
-        poly([[-28, 2], [-44, 2], [-44, 12], [-28, 12]], '#111'); // Dark mechanical recess
+        ], dark);
+        poly([[-28, 2], [-44, 2], [-44, 12], [-28, 12]], metal); // Metal recess
         // 3 gun barrels/nozzles (vertical)
         poly([[-48, -6], [-44, -6], [-44, 18], [-48, 18]], '#333');
         poly([[-42, -6], [-38, -6], [-38, 18], [-42, 18]], '#333');
         poly([[-36, -6], [-32, -6], [-32, 18], [-36, 18]], '#333');
+        line([[-46, 0], [-11, 0]], 'rgba(255, 255, 255, 0.3)', 1);
 
-        // Right Mid-Wing
+        // Right Mid-Wing (Contrast dark)
         poly([
             [11, 0],
             [46, 0],
             [46, 14],
             [11, 14]
-        ], p);
-        poly([[28, 2], [44, 2], [44, 12], [28, 12]], '#111');
+        ], dark);
+        poly([[28, 2], [44, 2], [44, 12], [28, 12]], metal);
         // 3 gun barrels/nozzles (vertical)
         poly([[48, -6], [44, -6], [44, 18], [48, 18]], '#333');
         poly([[42, -6], [38, -6], [38, 18], [42, 18]], '#333');
         poly([[36, -6], [32, -6], [32, 18], [36, 18]], '#333');
+        line([[46, 0], [11, 0]], 'rgba(255, 255, 255, 0.3)', 1);
 
         // 6. Rear Swept Wings (Large heavy primary stabilizers)
         // Left Rear Wing
@@ -2217,15 +2676,17 @@ function drawPlayerShape(ctx, shape, primary) {
             [-80, 52],      // wingtip corner outer
             [-74, 58],      // wingtip trailing notch
             [-12, 54]       // wing root trailing
-        ], '#1d222e');
-        // Left Wing Signature Color Slash (Orange trailing portion)
+        ], hull);
+        // Left Wing Signature Color Slash (now dark contrast)
         poly([
             [-55, 45],
             [-80, 52],
             [-76, 56],
             [-53, 49]
-        ], p);
-        
+        ], dark);
+        // Left Rear Wing White Highlight Line
+        line([[-11, 35], [-76, 53]], panel, 1.2);
+
         // Right Rear Wing
         poly([
             [11, 28],
@@ -2233,14 +2694,16 @@ function drawPlayerShape(ctx, shape, primary) {
             [80, 52],
             [74, 58],
             [12, 54]
-        ], '#1d222e');
-        // Right Wing Signature Color Slash (Orange trailing portion)
+        ], hull);
+        // Right Wing Signature Color Slash (now dark contrast)
         poly([
             [55, 45],
             [80, 52],
             [76, 56],
             [53, 49]
-        ], p);
+        ], dark);
+        // Right Rear Wing White Highlight Line
+        line([[11, 35], [76, 53]], panel, 1.2);
 
         // 7. Wingtip Vertical Stabilizers (Fences)
         // Left vertical wingtip plate
@@ -2249,7 +2712,11 @@ function drawPlayerShape(ctx, shape, primary) {
             [-84, 25],      // forward vertical stabilizer point
             [-84, 65],      // rear vertical stabilizer point
             [-78, 54]
-        ], '#111');
+        ], dark);
+        // Left Winglet details (accent color on tip, white highlight line)
+        poly([[-83, 30], [-84, 25], [-81, 28]], metal);
+        poly([[-83, 60], [-84, 65], [-81, 62]], metal);
+        line([[-82, 30], [-82, 60]], 'rgba(255, 255, 255, 0.45)', 1);
         line([[-84, 20], [-84, 70]], s, 2.5); // Wingtip launcher rail
         circ(-84, 20, 2, s, 0.9); // tip sensor node
 
@@ -2259,29 +2726,36 @@ function drawPlayerShape(ctx, shape, primary) {
             [84, 25],
             [84, 65],
             [78, 54]
-        ], '#111');
+        ], dark);
+        // Right Winglet details
+        poly([[83, 30], [84, 25], [81, 28]], metal);
+        poly([[83, 60], [84, 65], [81, 62]], metal);
+        line([[82, 30], [82, 60]], 'rgba(255, 255, 255, 0.45)', 1);
         line([[84, 20], [84, 70]], s, 2.5);
         circ(84, 20, 2, s, 0.9);
 
-        // 8. Heavy Rear Tail Fins (Forked stabilizers)
-        poly([[-11, 48], [-14, 88], [-7, 88], [-3, 48]], '#1d222e');
-        poly([[11, 48], [14, 88], [7, 88], [3, 48]], '#1d222e');
+        // 8. Heavy Rear Tail Fins (Forked stabilizers - 3 Spikes total matching image)
+        poly([[-11, 48], [-14, 88], [-7, 88], [-3, 48]], hull);
+        poly([[11, 48], [14, 88], [7, 88], [3, 48]], hull);
+        // Central long tail spike
+        poly([[-4, 48], [4, 48], [0, 102]], hull);
         // Accent stripes on tail
-        line([[-10, 55], [-12, 80]], s, 1.2);
-        line([[10, 55], [12, 80]], s, 1.2);
+        line([[-10, 55], [-12, 80]], 'rgba(255,255,255,0.45)', 1.2);
+        line([[10, 55], [12, 80]], 'rgba(255,255,255,0.45)', 1.2);
+        line([[0, 48], [0, 96]], 'rgba(255,255,255,0.45)', 1.2);
 
         // 9. Twin Heavy Engine Assembly (Nacelles & Exhaust Glow)
         // Left Engine Pod (Nacelle)
-        poly([[-36, 42], [-22, 42], [-20, 56], [-38, 56]], '#222');
+        poly([[-36, 42], [-22, 42], [-20, 56], [-38, 56]], dark);
         poly([[-35, 56], [-23, 56], [-22, 65], [-36, 65]], '#111'); // Exhaust nozzle
-        circ(-29, 65, 6, s, 0.85); // propulsion glow
-        circ(-29, 65, 2, '#fff', 0.6);
+        // circ(-29, 65, 6, s, 0.85); // propulsion glow (removed)
+        // circ(-29, 65, 2, '#fff', 0.6);
 
         // Right Engine Pod (Nacelle)
-        poly([[36, 42], [22, 42], [20, 56], [38, 56]], '#222');
+        poly([[36, 42], [22, 42], [20, 56], [38, 56]], dark);
         poly([[35, 56], [23, 56], [22, 65], [36, 65]], '#111');
-        circ(29, 65, 6, s, 0.85);
-        circ(29, 65, 2, '#fff', 0.6);
+        // circ(29, 65, 6, s, 0.85); (removed)
+        // circ(29, 65, 2, '#fff', 0.6);
 
 
     } else if (shape === 'bomber') {
@@ -2345,9 +2819,9 @@ function drawPlayerShape(ctx, shape, primary) {
         line([[50, 18], [6, 41]], '#151713', 1);
         circ(0, 22, 1.8, p, 0.75);
 
-        // Rear exhaust glow, small enough to preserve the stealth shape.
-        circ(-18, 43, 4, p, 0.55);
-        circ(18, 43, 4, p, 0.55);
+        // Rear exhaust glow (removed)
+        // circ(-18, 43, 4, p, 0.55);
+        // circ(18, 43, 4, p, 0.55);
         ctx.restore();
 
     } else if (shape === 'speeder') {
@@ -2395,70 +2869,158 @@ function drawPlayerShape(ctx, shape, primary) {
         line([[-5, 31], [-8, 61]], p, 1.2);
         line([[5, 31], [8, 61]], p, 1.2);
 
-        // Compact exhaust glow.
-        circ(0, 82, 3.5, p, 0.85);
-        circ(-22, 60, 3.5, p, 0.6);
-        circ(22, 60, 3.5, p, 0.6);
+        // Compact exhaust glow (removed)
+        // circ(0, 82, 3.5, p, 0.85);
+        // circ(-22, 60, 3.5, p, 0.6);
+        // circ(22, 60, 3.5, p, 0.6);
         ctx.restore();
 
     } else if (shape === 'stealth') {
-        // --- STEALTH: Raven needle interceptor ---
-        const hull = p;
-        const shade = p;
-        const panel = '#707983';
-        const glass = '#0b0d12';
-        const dark = '#151a22';
+        // --- STEALTH: Dual Nose-Cone Stealth Striker (Reference Image Match) ---
+        const hull = p; // Chosen color is the major body color
+        const dark = '#1a1f26'; // Deep dark panels
+        const metal = '#2e3542'; // Metallic accent plates
+        const panel = 'rgba(255, 255, 255, 0.35)'; // White panel outlines
+        const glass = '#0a0d14'; // Cockpit glass
 
         ctx.save();
         ctx.shadowBlur = 8 / sc;
         ctx.shadowColor = p;
 
-        // Long central fuselage and nose, based on the narrow white body in the reference.
-        poly([[0, -58], [12, -20], [8, 30], [4, 58], [0, 70], [-4, 58], [-8, 30], [-12, -20]], hull);
-        poly([[0, -48], [8, -24], [6, 15], [0, 34], [-6, 15], [-8, -24]], shade, 0.55);
-        line([[0, -58], [0, 68]], p, 0.8);
+        // 1. Two Long Parallel Nose Cones (extending far forward)
+        // Left Nose Cone
+        poly([
+            [-17, -90],     // Sharp nose tip
+            [-5, -90],
+            [-5, 38],
+            [-17, 38]
+        ], hull);
+        // Left Nose Cone Dark Panel overlay
+        poly([[-14, -68], [-8, -68], [-8, 28], [-14, 28]], dark);
+        line([[-11, -68], [-11, 28]], panel, 0.8);
 
-        // Tall black cockpit canopy.
-        poly([[0, -54], [7, -48], [7, -14], [3, -4], [0, 0], [-3, -4], [-7, -14], [-7, -48]], glass, 0.98);
-        line([[-5, -48], [-5, -16]], panel, 0.8);
-        line([[5, -48], [5, -16]], panel, 0.8);
+        // Right Nose Cone
+        poly([
+            [5, -90],       // Sharp nose tip
+            [17, -90],
+            [17, 38],
+            [5, 38]
+        ], hull);
+        // Right Nose Cone Dark Panel overlay
+        poly([[8, -68], [14, -68], [14, 28], [8, 28]], dark);
+        line([[11, -68], [11, 28]], panel, 0.8);
 
-        // Small forward canards.
-        poly([[-12, -30], [-25, -42], [-20, -26], [-11, -18]], hull);
-        poly([[12, -30], [25, -42], [20, -26], [11, -18]], hull);
-        line([[-23, -40], [-14, -20]], panel, 0.9);
-        line([[23, -40], [14, -20]], panel, 0.9);
+        // 2. Central Fuselage Core (between the nose cones)
+        poly([
+            [-5, -45],
+            [5, -45],
+            [7, 24],
+            [0, 30],
+            [-7, 24]
+        ], dark);
+        // Central body accent panel
+        poly([
+            [-3, -40],
+            [3, -40],
+            [4, 18],
+            [0, 22],
+            [-4, 18]
+        ], hull);
 
-        // Angular delta wings with hooked rear tips.
-        poly([[-8, -8], [-42, -6], [-62, 30], [-54, 54], [-48, 44], [-20, 12]], hull);
-        poly([[8, -8], [42, -6], [62, 30], [54, 54], [48, 44], [20, 12]], hull);
-        poly([[-42, -6], [-62, 30], [-55, 35], [-38, 2]], shade, 0.65);
-        poly([[42, -6], [62, 30], [55, 35], [38, 2]], shade, 0.65);
-        poly([[-54, 54], [-48, 44], [-42, 62], [-48, 72]], hull);
-        poly([[54, 54], [48, 44], [42, 62], [48, 72]], hull);
+        // 3. Cockpit Canopy (on the central fuselage)
+        poly([[-3, -15], [3, -15], [3, 10], [-3, 10]], glass);
+        let canopyGrad = ctx.createLinearGradient(-3, -14, 3, 8);
+        canopyGrad.addColorStop(0, '#0c1822');
+        canopyGrad.addColorStop(0.4, '#3a4e5e');
+        canopyGrad.addColorStop(0.7, '#7a8e98');
+        canopyGrad.addColorStop(1, '#060a0e');
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, -14);
+        ctx.bezierCurveTo(3, -12, 3, 5, 0, 8);
+        ctx.bezierCurveTo(-3, 5, -3, -12, 0, -14);
+        ctx.closePath();
+        ctx.fillStyle = canopyGrad;
+        ctx.fill();
+        ctx.restore();
+        line([[0, -14], [0, 8]], 'rgba(255,255,255,0.2)', 0.6);
 
-        // Wing panel cuts and dark triangular insets.
-        line([[-39, -3], [-53, 27], [-48, 44]], dark, 2);
-        line([[39, -3], [53, 27], [48, 44]], dark, 2);
-        line([[-8, -8], [-20, 12], [-34, 42]], panel, 1);
-        line([[8, -8], [20, 12], [34, 42]], panel, 1);
-        poly([[-22, 8], [-35, 22], [-18, 18]], dark, 0.65);
-        poly([[22, 8], [35, 22], [18, 18]], dark, 0.65);
-        line([[-23, 9], [-34, 21]], p, 1.1);
-        line([[23, 9], [34, 21]], p, 1.1);
+        // 4. Large Swept-Back Main Wings with Hooked Tips
+        // LEFT WING
+        poly([
+            [-17, -25],     // Wing root leading
+            [-72, -10],     // Wingtip leading edge
+            [-72, 0],       // Wingtip trailing
+            [-17, 20]       // Wing root trailing
+        ], hull);
+        // Left Wing Tip Hook (forward-swept crescent)
+        poly([
+            [-72, -10],
+            [-86, -10],
+            [-86, -20],
+            [-80, -22],
+            [-72, -12]
+        ], dark);
+        poly([[-84, -12], [-86, -10], [-84, -18]], hull); // Highlight tip
+        // Left Wing dark panel inlay
+        poly([[-17, -15], [-68, -8], [-68, -2], [-17, 10]], dark);
+        // Left Wing panel lines
+        line([[-17, -20], [-70, -9]], panel, 1);
+        line([[-17, 5], [-68, -5]], panel, 0.8);
 
-        // Rear spine, twin strakes, and engine column.
-        poly([[-8, 24], [-17, 46], [-10, 44], [-5, 30]], hull);
-        poly([[8, 24], [17, 46], [10, 44], [5, 30]], hull);
-        poly([[-4, 35], [0, 26], [4, 35], [4, 65], [0, 74], [-4, 65]], dark);
-        line([[-10, 32], [-11, 58]], panel, 1);
-        line([[10, 32], [11, 58]], panel, 1);
+        // RIGHT WING
+        poly([
+            [17, -25],
+            [72, -10],
+            [72, 0],
+            [17, 20]
+        ], hull);
+        // Right Wing Tip Hook (forward-swept crescent)
+        poly([
+            [72, -10],
+            [86, -10],
+            [86, -20],
+            [80, -22],
+            [72, -12]
+        ], dark);
+        poly([[84, -12], [86, -10], [84, -18]], hull);
+        // Right Wing dark panel inlay
+        poly([[17, -15], [68, -8], [68, -2], [17, 10]], dark);
+        // Right Wing panel lines
+        line([[17, -20], [70, -9]], panel, 1);
+        line([[17, 5], [68, -5]], panel, 0.8);
 
-        // Compact glowing exhausts.
-        circ(0, 73, 4, p, 0.9);
-        circ(-10, 58, 3.5, p, 0.6);
-        circ(10, 58, 3.5, p, 0.6);
-        circ(0, 73, 1.8, '#fff', 0.7);
+        // 5. Stabilizers (rear diagonal winglets pointing outward/back)
+        // Left Stabilizer
+        poly([[-17, 15], [-35, 38], [-30, 42], [-17, 30]], hull);
+        poly([[-28, 30], [-35, 38], [-30, 42], [-25, 38]], dark); // Dark tip
+        // Right Stabilizer
+        poly([[17, 15], [35, 38], [30, 42], [17, 30]], hull);
+        poly([[28, 30], [35, 38], [30, 42], [25, 38]], dark);
+
+        // 6. Extremely Long Tail Columns (extending far backward)
+        // Left Tail Column
+        poly([
+            [-14, 20],
+            [-10, 20],
+            [-10, 110],
+            [-14, 110]
+        ], hull);
+        poly([[-13, 30], [-11, 30], [-11, 105], [-13, 105]], dark); // Dark accent strip
+        // Right Tail Column
+        poly([
+            [10, 20],
+            [14, 20],
+            [14, 110],
+            [10, 110]
+        ], hull);
+        poly([[11, 30], [13, 30], [13, 105], [11, 105]], dark);
+
+        // 7. Mechanical Detailing & Panel Lines
+        line([[0, -45], [0, -18]], panel, 0.8);
+        line([[0, 12], [0, 28]], panel, 0.8);
+        poly([[-4, 26], [4, 26], [2, 38], [-2, 38]], dark); // Engine nozzle casing
+
         ctx.restore();
 
     } else if (shape === 'titan') {
@@ -2522,9 +3084,151 @@ function drawPlayerShape(ctx, shape, primary) {
         line([[13, -33], [24, 5]], panel, 1);
         circ(-8, -52, 1.9, dark, 0.95);
         circ(8, -52, 1.9, dark, 0.95);
-        circ(0, 113, 4.5, p, 0.85);
-        circ(-30, 118, 3.5, p, 0.55);
-        circ(30, 118, 3.5, p, 0.55);
+        // circ(0, 113, 4.5, p, 0.85); (removed)
+        // circ(-30, 118, 3.5, p, 0.55);
+        // circ(30, 118, 3.5, p, 0.55);
+        ctx.restore();
+    } else if (shape === 'vintage') {
+        // --- VINTAGE: Steampunk Glider Ship (Reference Image Match) ---
+        const hull = '#2b2621'; // Dark metallic bronze/copper
+        const shade = '#1c1815'; // Very dark/shaded bronze
+        const metal = '#4e4138'; // Medium metal grey/bronze
+        const panel = 'rgba(255, 255, 255, 0.45)'; // Semi-transparent white highlights
+        const glass = '#0f0a05'; // Dark copper-tinted cockpit backing
+
+        ctx.save();
+        ctx.shadowBlur = 8 / sc;
+        ctx.shadowColor = p;
+
+        // 1. Long Central Lower Spine / Tail Boom
+        poly([[-3, 20], [3, 20], [2, 100], [-2, 100]], hull);
+        line([[0, 20], [0, 96]], panel, 1);
+
+        // 2. Tail Gear/Pulley Joint & Fan-Feather Stabilizers (Steampunk bird tail)
+        // Draw tail gear outline
+        ctx.strokeStyle = p;
+        ctx.lineWidth = 1.5 / sc;
+        ctx.beginPath();
+        ctx.arc(0, 100, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        // Spokes inside the gear
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+            line([[0, 100], [10 * Math.sin(a), 100 + 10 * Math.cos(a)]], p, 1);
+        }
+        // Center hub
+        circ(0, 100, 3, p);
+
+        // Fan tail stabilizers (feathers) radiating from tail gear
+        poly([[0, 100], [-15, 130], [0, 140], [15, 130]], p);
+        poly([[0, 100], [-30, 120], [-15, 130]], p, 0.7);
+        poly([[0, 100], [30, 120], [15, 130]], p, 0.7);
+        // Highlight rib lines for tail feathers
+        line([[0, 100], [-30, 120]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[0, 100], [-15, 130]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[0, 100], [0, 140]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[0, 100], [15, 130]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[0, 100], [30, 120]], 'rgba(255,255,255,0.7)', 1.2);
+
+        // 3. Central Bird/Insect Fuselage
+        poly([[-12, -45], [12, -45], [16, -20], [16, 20], [8, 40], [-8, 40], [-16, 20], [-16, -20]], hull);
+        poly([[-8, -40], [8, -40], [11, -20], [11, 15], [6, 30], [-6, 30], [-11, 15], [-11, -20]], shade);
+
+        // Vertical mechanical strip overlays
+        poly([[-3, -45], [3, -45], [3, 40], [-3, 40]], metal);
+        line([[-3, -45], [-3, 40]], panel, 0.8);
+        line([[3, -45], [3, 40]], panel, 0.8);
+
+        // Canopy (Steampunk glass with brass ring)
+        poly([[-6, -30], [6, -30], [8, -15], [8, 5], [0, 15], [-8, 5], [-8, -15]], glass);
+        let brassGrad = ctx.createLinearGradient(-6, -30, 8, 15);
+        brassGrad.addColorStop(0, '#e5a93b'); // Brass gold
+        brassGrad.addColorStop(0.5, '#ffd700'); // Glowing gold
+        brassGrad.addColorStop(1, '#8b5a2b'); // Dark bronze
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, -28);
+        ctx.bezierCurveTo(5.5, -24, 5.5, 0, 0, 10);
+        ctx.bezierCurveTo(-5.5, 0, -5.5, -24, 0, -28);
+        ctx.closePath();
+        ctx.fillStyle = brassGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#e5a93b';
+        ctx.lineWidth = 1.5 / sc;
+        ctx.stroke();
+        ctx.restore();
+
+        // 4. Large Circular Wing joints (Wheels/Gears)
+        for (let side of [-1, 1]) {
+            const cx = side * 28;
+            const cy = -25;
+
+            // Arched safety brace/guard above the gear wheel
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2 / sc;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 16, -Math.PI, 0);
+            ctx.stroke();
+            ctx.restore();
+
+            // Main joint gear base
+            circ(cx, cy, 12, shade);
+
+            // Gear outer ring outline
+            ctx.strokeStyle = p;
+            ctx.lineWidth = 1.8 / sc;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Spokes inside the gear
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                line([[cx, cy], [cx + 12 * Math.sin(a), cy + 12 * Math.cos(a)]], p, 1);
+            }
+
+            // Gear center hub
+            circ(cx, cy, 4, p);
+
+            // Connective mechanical arm/hinge from body to gear
+            poly([[side * 12, -28], [cx, cy - 2], [cx, cy + 2], [side * 12, -22]], metal);
+            line([[side * 12, -25], [cx, cy]], panel, 1);
+        }
+
+        // 5. Steampunk Glider Wings (Multi-feather panels)
+        // Left Glider Wing
+        // Rib 1 (Leading Edge)
+        poly([[-28, -25], [-110, -25], [-95, -5]], p);
+        // Rib 2
+        poly([[-28, -25], [-95, -5], [-75, 10]], p, 0.85);
+        // Rib 3
+        poly([[-28, -25], [-75, 10], [-55, 20]], p, 0.7);
+        // Rib 4
+        poly([[-28, -25], [-55, 20], [-35, 25]], p, 0.55);
+
+        // Left Wing Highlight Rib Lines
+        line([[-28, -25], [-110, -25]], 'rgba(255,255,255,0.85)', 1.5);
+        line([[-28, -25], [-95, -5]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[-28, -25], [-75, 10]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[-28, -25], [-55, 20]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[-28, -25], [-35, 25]], 'rgba(255,255,255,0.7)', 1.2);
+
+        // Right Glider Wing (Mirror)
+        // Rib 1 (Leading Edge)
+        poly([[28, -25], [110, -25], [95, -5]], p);
+        // Rib 2
+        poly([[28, -25], [95, -5], [75, 10]], p, 0.85);
+        // Rib 3
+        poly([[28, -25], [75, 10], [55, 20]], p, 0.7);
+        // Rib 4
+        poly([[28, -25], [55, 20], [35, 25]], p, 0.55);
+
+        // Right Wing Highlight Rib Lines
+        line([[28, -25], [110, -25]], 'rgba(255,255,255,0.85)', 1.5);
+        line([[28, -25], [95, -5]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[28, -25], [75, 10]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[28, -25], [55, 20]], 'rgba(255,255,255,0.7)', 1.2);
+        line([[28, -25], [35, 25]], 'rgba(255,255,255,0.7)', 1.2);
+
         ctx.restore();
     }
     ctx.restore();
