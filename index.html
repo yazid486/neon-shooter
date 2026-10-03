@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Neon Space Shooter</title>
+    <!-- Add modern fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="lives-board" class="hidden">
+            <!-- Player 1 HUD -->
+            <div class="player-hud p1-hud" id="p1-hud">
+                <div class="hud-wrapper">
+                    <!-- Left Side: Time/Lives Box -->
+                    <div class="hud-time-box">
+                        <div class="hud-time-content cyber-hp-dots">
+                            <span class="hud-big-val">03</span>
+                            <span class="hud-small-label">LIVES</span>
+                        </div>
+                        <div class="hud-slant-accents">
+                            <div class="accent-line"></div>
+                            <div class="accent-line"></div>
+                            <div class="accent-line-short"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Health Bar Box -->
+                    <div class="hud-bar-area">
+                        <div class="hud-health-bar-container state-high" id="p1-health-segments">
+                            <div class="hud-hp-bar-fill" id="p1-hp-fill" style="width: 100%;"></div>
+                            <div class="hud-player-tag">PLAYER 01</div>
+                        </div>
+                        <div class="hud-bottom-row">
+                            <div class="hud-level-text">LEVEL <span id="p1-level">1</span> <span
+                                    class="decor-dashes">---</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hud-extra-stats">
+                    <span class="kills-label" style="color: #0ff;">KILLS: <span id="p1-kills">0</span></span>
+                    <div class="timers-container">
+                        <div class="timer-wrapper" id="p1-shield-wrapper">
+                            <div class="timer-bar shield-bar" id="p1-shield-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p1-shooter-wrapper">
+                            <div class="timer-bar shooter-bar" id="p1-shooter-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p1-overdrive-wrapper">
+                            <div class="timer-bar overdrive-bar" id="p1-overdrive-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 2 HUD -->
+            <div class="player-hud p2-hud" id="p2-hud">
+                <div class="hud-wrapper">
+                    <!-- Left Side: Time/Lives Box -->
+                    <div class="hud-time-box">
+                        <div class="hud-time-content cyber-hp-dots">
+                            <span class="hud-big-val">03</span>
+                            <span class="hud-small-label">LIVES</span>
+                        </div>
+                        <div class="hud-slant-accents">
+                            <div class="accent-line"></div>
+                            <div class="accent-line"></div>
+                            <div class="accent-line-short"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Health Bar Box -->
+                    <div class="hud-bar-area">
+                        <div class="hud-health-bar-container state-high" id="p2-health-segments">
+                            <div class="hud-hp-bar-fill" id="p2-hp-fill" style="width: 100%;"></div>
+                            <div class="hud-player-tag">PLAYER 02</div>
+                        </div>
+                        <div class="hud-bottom-row">
+                            <div class="hud-level-text">LEVEL <span id="p2-level">1</span> <span
+                                    class="decor-dashes">---</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hud-extra-stats">
+                    <span class="kills-label" style="color: #f00;">KILLS: <span id="p2-kills">0</span></span>
+                    <div class="timers-container">
+                        <div class="timer-wrapper" id="p2-shield-wrapper">
+                            <div class="timer-bar shield-bar" id="p2-shield-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p2-shooter-wrapper">
+                            <div class="timer-bar shooter-bar" id="p2-shooter-bar"></div>
+                        </div>
+                        <div class="timer-wrapper" id="p2-overdrive-wrapper">
+                            <div class="timer-bar overdrive-bar" id="p2-overdrive-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="pause-btn" class="hidden">||</button>
+
+                <!-- Minimal Sci-Fi Start Screen -->
+        <div id="start-screen" class="screen active home-screen">
+            <div class="home-bg"></div>
+            <div class="home-grid-floor"></div>
+            <div class="home-planet"></div>
+            <div class="home-vignette"></div>
+
+            <div class="home-topbar">
+                <div class="topbar-left">
+                    <span class="sys-dot"></span>
+                    <span class="sys-text">SYSTEM ONLINE</span>
+                    <span class="topbar-divider"></span>
+                    <span class="home-brand">NEON SHOOTER <em>v2.0</em></span>
+                </div>
+                <div class="theme-palette" id="theme-palette"
+                    title="Hover a dot to preview, click to set &mdash; keys 1-8 jump, T cycles, Up &uarr;&uarr; auto-toggles, Down &darr;&darr; stops, dice = random">
+                    <span class="theme-palette-label">THEME</span>
+                    <div class="theme-swatches" id="theme-swatches"></div>
+                    <button class="theme-random-btn" id="theme-random-btn" type="button"
+                        title="Random theme">&#127922;</button>
+                </div>
+
+                <button id="enemy-preview-btn" class="enemy-preview-btn" title="Enemy Database">
+                    <span class="enemy-design-preview"></span>
+                    <span class="enemy-label">THREAT DB</span>
+                </button>
+            </div>
+
+            <div id="enemy-preview-modal" class="enemy-modal hidden">
+                <div class="enemy-modal-bg"></div>
+                <div class="enemy-modal-panel">
+                    <div class="enemy-modal-header">
+                        <span class="enemy-modal-title">THREAT DATABASE</span>
+                        <button id="enemy-modal-close" class="enemy-modal-close" title="Close">&times;</button>
+                    </div>
+                    <div class="enemy-modal-body" id="enemy-modal-body">
+                        <!-- Enemy previews injected here by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="home-layout">
+                <div class="home-console">
+                    <div class="home-eyebrow">// LAUNCH CONSOLE</div>
+                    <h1 class="home-title">NEON<br>SHOOTER</h1>
+                    <p class="home-subtitle">TWO-PLAYER ARCADE COMBAT IN DEEP SPACE &mdash; TUNE YOUR HULL, PICK YOUR SIGNATURE COLOR, ENGAGE.</p>
+
+                    <div class="home-actions">
+                    <div class="mode-selection-container">
+                        <div class="mode-option selected" id="mode-1p" data-mode="1">
+                            <span class="mode-dot"></span> 1 PLAYER
+                        </div>
+                        <div class="mode-option" id="mode-2p" data-mode="2">
+                            <span class="mode-dot"></span> 2 PLAYERS
+                        </div>
+                    </div>
+                    <div class="glow-toggle selected" id="glow-toggle">
+                        <span class="mode-dot"></span> GLOW FX: ON
+                    </div>
+                </div>
+
+                    <button id="start-btn" class="home-start-btn">
+                        <span class="btn-corner btn-corner--tl"></span>
+                        <span class="btn-corner btn-corner--br"></span>
+                        <span>INITIALIZE</span>
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+                        </svg>
+                    </button>
+
+                    <div class="mission-data" aria-hidden="true">
+                        <div class="data-row"><span class="data-key">SECTOR</span><span class="data-val">7G</span></div>
+                        <div class="data-row"><span class="data-key">THREAT</span><span class="data-val">LVL 03</span></div>
+                        <div class="data-row"><span class="data-key">POWER CORE</span><span class="data-val">NOMINAL</span></div>
+                        <div class="data-row"><span class="data-key">FUEL</span><span class="data-val">98%</span></div>
+                    </div>
+                </div>
+
+                <div class="home-seam" aria-hidden="true">
+                    <span class="seam-label">SYNC</span>
+                    <span class="seam-node"></span>
+                </div>
+
+                <div class="home-hangar">
+                    <div class="hangar-header">
+                        <span class="hangar-title">HANGAR // VESSEL CONFIG</span>
+                        <span class="hangar-hint">SELECT HULL &amp; COLOR SIGNATURE</span>
+                    </div>
+
+                    <div class="home-panels">
+                <!-- Player 1 -->
+                <div class="hud-panel p1-panel">
+                    <span class="panel-notch panel-notch--tl"></span>
+                    <span class="panel-notch panel-notch--tr"></span>
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 01 <span>[WASD+SPACE]</span>
+                        <span class="panel-status"><span class="sys-dot"></span>LINK</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="ship-preview-box">
+                            <canvas class="ship-preview-canvas" id="p1-ship-preview" width="200" height="200"></canvas>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="1" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="1" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="1" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="1" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="1" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="1" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="1" data-shape="titan">Titan</button>
+                                <button class="shape-select" data-player="1" data-shape="vintage">Vintage</button>
+                                <button class="shape-select" data-player="1" data-shape="4-wing">4-Wing</button>
+                                <button class="shape-select" data-player="1" data-shape="falcon">Falcon</button>
+                                <button class="shape-select" data-player="1" data-shape="phantom">Phantom</button>
+                                <button class="shape-select" data-player="1" data-shape="gunship">Gunship</button>
+                                <button class="shape-select" data-player="1" data-shape="razor">Razor</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                                        <button class="color-select" data-player="1" data-color="#ED5565" style="background-color: #ED5565;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#FC6E51" style="background-color: #FC6E51;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#FFCE54" style="background-color: #FFCE54;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#A0D468" style="background-color: #A0D468;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#48CFAD" style="background-color: #48CFAD;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#4FC1E9" style="background-color: #4FC1E9;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#5D9CEC" style="background-color: #5D9CEC;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#AC92EC" style="background-color: #AC92EC;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#EC87C0" style="background-color: #EC87C0;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#F5F7FA" style="background-color: #F5F7FA;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#CCD1D9" style="background-color: #CCD1D9;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#656D78" style="background-color: #656D78;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#505050" style="background-color: #505050;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#B4EB28" style="background-color: #B4EB28;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#1E3C5A" style="background-color: #1E3C5A;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#2D6BE6" style="background-color: #2D6BE6;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#731E1E" style="background-color: #731E1E;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#12AA9A" style="background-color: #12AA9A;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#0391AE" style="background-color: #0391AE;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#0031AB" style="background-color: #0031AB;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#5F2B97" style="background-color: #5F2B97;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#B73052" style="background-color: #B73052;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#B03E16" style="background-color: #B03E16;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#A26313" style="background-color: #A26313;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#536D13" style="background-color: #536D13;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#13783F" style="background-color: #13783F;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#332E26" style="background-color: #332E26;"></button>
+                                                        <button class="color-select" data-player="1" data-color="#9A9287" style="background-color: #9A9287;"></button>
+                            </div>
+                            </div>
+                    </div>
+                </div>
+
+                <!-- Player 2 (dimmed until 2P mode is selected) -->
+                <div class="hud-panel p2-panel inactive">
+                    <span class="panel-notch panel-notch--tl"></span>
+                    <span class="panel-notch panel-notch--tr"></span>
+                    <div class="hud-panel-title">
+                        <span class="neon-star">*</span> PLAYER 02 <span>[ARROWS+ENTER]</span>
+                        <span class="panel-status"><span class="sys-dot"></span>LINK</span>
+                    </div>
+                    <div class="hud-options-grid">
+                        <div class="ship-preview-box">
+                            <canvas class="ship-preview-canvas" id="p2-ship-preview" width="200" height="200"></canvas>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">HULL_TYPE</div>
+                            <div class="shape-options">
+                                <button class="shape-select" data-player="2" data-shape="classic">Classic</button>
+                                <button class="shape-select" data-player="2" data-shape="fighter">Fighter</button>
+                                <button class="shape-select" data-player="2" data-shape="interceptor">Intcpt</button>
+                                <button class="shape-select" data-player="2" data-shape="bomber">Bomber</button>
+                                <button class="shape-select" data-player="2" data-shape="speeder">Speeder</button>
+                                <button class="shape-select" data-player="2" data-shape="stealth">Stealth</button>
+                                <button class="shape-select" data-player="2" data-shape="titan">Titan</button>
+                                <button class="shape-select" data-player="2" data-shape="vintage">Vintage</button>
+                                <button class="shape-select" data-player="2" data-shape="4-wing">4-Wing</button>
+                                <button class="shape-select" data-player="2" data-shape="falcon">Falcon</button>
+                                <button class="shape-select" data-player="2" data-shape="phantom">Phantom</button>
+                                <button class="shape-select" data-player="2" data-shape="gunship">Gunship</button>
+                                <button class="shape-select" data-player="2" data-shape="razor">Razor</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <div class="hud-label">COLOR_SIG</div>
+                            <div class="color-options">
+                                                        <button class="color-select" data-player="2" data-color="#ED5565" style="background-color: #ED5565;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#FC6E51" style="background-color: #FC6E51;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#FFCE54" style="background-color: #FFCE54;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#A0D468" style="background-color: #A0D468;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#48CFAD" style="background-color: #48CFAD;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#4FC1E9" style="background-color: #4FC1E9;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#5D9CEC" style="background-color: #5D9CEC;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#AC92EC" style="background-color: #AC92EC;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#EC87C0" style="background-color: #EC87C0;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#F5F7FA" style="background-color: #F5F7FA;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#CCD1D9" style="background-color: #CCD1D9;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#656D78" style="background-color: #656D78;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#505050" style="background-color: #505050;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#B4EB28" style="background-color: #B4EB28;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#1E3C5A" style="background-color: #1E3C5A;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#2D6BE6" style="background-color: #2D6BE6;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#731E1E" style="background-color: #731E1E;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#12AA9A" style="background-color: #12AA9A;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#0391AE" style="background-color: #0391AE;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#0031AB" style="background-color: #0031AB;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#5F2B97" style="background-color: #5F2B97;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#B73052" style="background-color: #B73052;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#B03E16" style="background-color: #B03E16;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#A26313" style="background-color: #A26313;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#536D13" style="background-color: #536D13;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#13783F" style="background-color: #13783F;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#332E26" style="background-color: #332E26;"></button>
+                                                        <button class="color-select" data-player="2" data-color="#9A9287" style="background-color: #9A9287;"></button>
+                            </div>
+                            </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="home-footer">
+                <span class="footer-status"><span class="sys-dot"></span> E-GRID ONLINE</span>
+                <span>42.6629&deg; N &middot; 21.1655&deg; E</span>
+                <span class="barcode">|||| ||| | ||</span>
+            </div>
+        </div>
+
+
+        <div id="game-over-screen" class="rhombus-screen hidden">
+            <div class="rhombus-container">
+                <div class="hud-cluster">
+                    <div class="side-wrap side-wrap--left">
+                        <div class="hex-panel hex-panel--left">
+                            <div class="hex-lines"><span></span><span></span></div>
+                            <div class="hex-accent hex-accent--br"></div>
+                        </div>
+                    </div>
+                    <div class="center-col">
+                        <div class="top-display">
+                            <div class="bars">
+                                <span class="bar bar--1"></span>
+                                <span class="bar bar--2"></span>
+                                <span class="bar bar--3"></span>
+                                <span class="bar bar--4"></span>
+                            </div>
+                        </div>
+                        <div class="main-panel">
+                            <div class="grid-lines"></div>
+                            <div class="wave-field">
+                                <div class="wave wave--a"></div>
+                                <div class="wave wave--a wave--a-glow"></div>
+                                <div class="wave wave--b"></div>
+                                <div class="wave wave--b wave--b-glow"></div>
+                            </div>
+                        </div>
+                        <div class="label">SIGNAL LOST</div>
+                    </div>
+                    <div class="side-wrap side-wrap--right">
+                        <div class="hex-panel hex-panel--right">
+                            <div class="ring-icon">
+                                <div class="ring"></div>
+                                <div class="ring-core"></div>
+                            </div>
+                            <div class="speed-lines"><span></span><span></span><span></span></div>
+                            <div class="hex-accent hex-accent--bl"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="rhombus-subtitle">MISSION TERMINATED</div>
+                <h1 class="rhombus-title">GAME OVER</h1>
+                <div class="rhombus-button-group">
+                    <button id="restart-btn" class="rhombus-btn">RETRY</button>
+                    <button id="home-btn" class="rhombus-btn">HOME</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="pause-screen" class="rhombus-screen hidden">
+            <div class="rhombus-container">
+                <div class="hud-cluster">
+                    <div class="side-wrap side-wrap--left">
+                        <div class="hex-panel hex-panel--left">
+                            <div class="hex-lines"><span></span><span></span></div>
+                            <div class="hex-accent hex-accent--br"></div>
+                        </div>
+                    </div>
+                    <div class="center-col">
+                        <div class="top-display">
+                            <div class="bars">
+                                <span class="bar bar--1"></span>
+                                <span class="bar bar--2"></span>
+                                <span class="bar bar--3"></span>
+                                <span class="bar bar--4"></span>
+                            </div>
+                        </div>
+                        <div class="main-panel">
+                            <div class="grid-lines"></div>
+                            <div class="wave-field">
+                                <div class="wave wave--a"></div>
+                                <div class="wave wave--a wave--a-glow"></div>
+                                <div class="wave wave--b"></div>
+                                <div class="wave wave--b wave--b-glow"></div>
+                            </div>
+                        </div>
+                        <div class="label">STANDBY</div>
+                    </div>
+                    <div class="side-wrap side-wrap--right">
+                        <div class="hex-panel hex-panel--right">
+                            <div class="ring-icon">
+                                <div class="ring"></div>
+                                <div class="ring-core"></div>
+                            </div>
+                            <div class="speed-lines"><span></span><span></span><span></span></div>
+                            <div class="hex-accent hex-accent--bl"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="rhombus-subtitle">SYSTEM PAUSED</div>
+                <h1 class="rhombus-title">PAUSE</h1>
+                <div class="rhombus-button-group">
+                    <button id="resume-btn" class="rhombus-btn">CONTINUE</button>
+                    <button id="quit-btn" class="rhombus-btn">HOME</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="theme-toast"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="game.js"></script>
+</body>
+
+</html>
